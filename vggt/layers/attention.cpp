@@ -1,7 +1,24 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @file attention.cpp
+ * @brief Implementation of the Attention module for vision transformers
+ *
+ * This file implements the AttentionImpl class methods defined in attention.h.
+ * It provides the core functionality for multi-head self-attention mechanism
+ * used in vision transformers, including:
+ *
+ * 1. Constructor for initializing the attention module with specified parameters
+ * 2. Forward method that implements the attention computation logic
+ * 3. Support for both standard attention implementation and fused attention kernels
+ * 4. Optional query-key normalization
+ * 5. Efficient memory layout transformations for query, key and value tensors
+ * 6. Dropout regularization for attention weights and projection outputs
+ * 7. Support for positional embeddings integration
+ *
+ * The implementation uses PyTorch's tensor operations and modules to ensure
+ * compatibility with the PyTorch ecosystem and efficient execution on both
+ * CPU and GPU devices. It includes optimizations for both training and inference
+ * scenarios.
+ */
 
 #include "attention.h"
 

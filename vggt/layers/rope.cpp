@@ -1,7 +1,23 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @brief Implementation of 2D Rotary Position Embeddings (RoPE)
+ *
+ * This file implements the methods defined in rope.h for 2D Rotary Position
+ * Embeddings used in vision transformers. It provides the core functionality
+ * for encoding spatial position information into transformer attention mechanisms.
+ *
+ * The implementation includes:
+ * 1. PositionGetter class implementation that generates and caches 2D spatial
+ *    coordinates for image patches
+ * 2. RotaryPositionEmbedding2D class implementation that applies rotary embeddings
+ *    to token features based on their spatial positions
+ * 3. Efficient computation and caching of frequency components
+ * 4. Separate application of rotary embeddings for vertical and horizontal dimensions
+ * 5. Feature rotation operations that implement the core RoPE mechanism
+ *
+ * The implementation uses Eigen tensors for efficient numerical operations and
+ * includes caching mechanisms to avoid redundant computations across multiple
+ * forward passes with the same dimensions.
+ */
 
 #include "rope.h"
 #include <cmath>
@@ -164,8 +180,6 @@ Eigen::Tensor<float, 4> RotaryPositionEmbedding2D::forward(
     Tensor<float, 4> vertical_features(tokens.dimension(0), tokens.dimension(1),
                                       tokens.dimension(2), feature_dim);
     Tensor<float, 4> horizontal_features(tokens.dimension(0), tokens.dimension(1),
-                                        tokens.dimension(2), feature_dim);
-
     for (int i = 0; i < vertical_features.size(); ++i) {
         vertical_features.data()[i] = tokens.data()[i];
         horizontal_features.data()[i] = tokens.data()[i + feature_dim * tokens.dimension(0) * tokens.dimension(1) * tokens.dimension(2)];

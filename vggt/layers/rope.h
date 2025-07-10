@@ -1,9 +1,23 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
-
-// Implementation of 2D Rotary Position Embeddings (RoPE) in C++
+/**
+ * @brief 2D Rotary Position Embeddings (RoPE) for vision transformers
+ *
+ * This file defines classes for implementing 2D Rotary Position Embeddings,
+ * which provide a way to encode spatial position information into transformer
+ * attention mechanisms. RoPE enables the model to be aware of the relative
+ * positions of image patches in both horizontal and vertical dimensions.
+ *
+ * The implementation includes:
+ * 1. PositionGetter class for generating spatial position coordinates
+ * 2. RotaryPositionEmbedding2D class that applies rotary embeddings to token features
+ * 3. Efficient caching mechanisms to avoid redundant computations
+ * 4. Support for configurable frequency and scaling parameters
+ *
+ * Rotary Position Embeddings offer several advantages over traditional positional
+ * encodings, including better generalization to sequence lengths not seen during
+ * training and more effective modeling of relative positions between tokens.
+ * This implementation extends the original 1D RoPE to handle 2D spatial positions
+ * for vision tasks.
+ */
 
 #pragma once
 

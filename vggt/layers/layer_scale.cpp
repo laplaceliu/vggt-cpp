@@ -1,13 +1,24 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @brief Implementation of layer scaling module for vision transformers
+ *
+ * This file implements the LayerScaleImpl class methods defined in layer_scale.h.
+ * It provides the core functionality for applying learnable per-channel scaling
+ * factors to transformer block outputs.
+ *
+ * The implementation includes:
+ * 1. Constructor that initializes the scaling parameters (gamma) with the specified
+ *    initial values and dimension
+ * 2. Forward method that applies the scaling factors to the input tensor
+ * 3. Support for both in-place operations (to optimize memory usage) and
+ *    standard out-of-place operations
+ *
+ * Layer scaling is a simple yet effective technique for improving training
+ * stability and performance in deep transformer networks.
+ */
 
 #include "layer_scale.h"
 
 namespace vggt {
-namespace layers {
-
 LayerScaleImpl::LayerScaleImpl(
     int64_t dim,
     torch::Tensor init_values,

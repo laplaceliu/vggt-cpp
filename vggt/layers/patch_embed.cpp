@@ -1,7 +1,22 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @brief Implementation of patch embedding module for vision transformers
+ *
+ * This file implements the PatchEmbedImpl class methods defined in patch_embed.h.
+ * It provides the core functionality for converting images into sequences of
+ * embedded patches for processing by vision transformer architectures.
+ *
+ * The implementation includes:
+ * 1. Constructor that initializes the patch embedding parameters, including
+ *    image size, patch size, input channels, and embedding dimension
+ * 2. A convolutional projection layer that maps each patch to the embedding space
+ * 3. Forward method that processes input images, validates dimensions, and
+ *    produces embedded patch sequences
+ * 4. Optional flattening of the embedded patches into a sequence format
+ * 5. Optional normalization of the embedded patches
+ *
+ * The implementation performs validation to ensure input dimensions match
+ * the expected model configuration, throwing exceptions for mismatches.
+ */
 
 #include "patch_embed.h"
 
@@ -58,8 +73,6 @@ torch::Tensor PatchEmbedImpl::forward(const torch::Tensor& x) {
         throw std::runtime_error(
             "Input channels (" + std::to_string(C) + ") doesn't match model (" +
             std::to_string(in_chans_) + ").");
-    }
-
     auto x_proj = proj->forward(x); // [B, embed_dim, H/patch_size, W/patch_size]
 
     if (flatten_embedding_) {

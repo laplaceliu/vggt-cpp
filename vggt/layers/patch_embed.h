@@ -1,7 +1,20 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @brief Patch embedding module for vision transformers
+ *
+ * This file defines the PatchEmbed module which implements the patch embedding
+ * technique used in Vision Transformers (ViT). Patch embedding is the first stage
+ * in a vision transformer that converts an image into a sequence of embedded patches.
+ *
+ * The implementation includes:
+ * 1. A PatchEmbedImpl class that splits images into fixed-size patches
+ * 2. Projection of each patch to an embedding dimension using a convolutional layer
+ * 3. Optional normalization of the embedded patches
+ * 4. Support for different image sizes, patch sizes, and embedding dimensions
+ *
+ * Patch embedding is a critical component that allows transformers, which were
+ * originally designed for sequence data, to process image data by converting
+ * 2D image patches into a sequence of token embeddings.
+ */
 
 #pragma once
 
@@ -20,8 +33,6 @@ public:
         int64_t in_chans = 3,
         int64_t embed_dim = 768,
         torch::nn::AnyModule norm = nullptr,
-        bool flatten_embedding = true);
-
     torch::Tensor forward(const torch::Tensor& x);
 
 private:
