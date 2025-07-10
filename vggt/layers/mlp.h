@@ -1,7 +1,18 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @file mlp.h
+ * @brief Multi-layer perceptron implementation for vision transformers
+ *
+ * This file defines the Mlp module which implements a standard multi-layer perceptron
+ * used in vision transformers. The MLP consists of:
+ *
+ * 1. A first linear layer that projects from input dimension to hidden dimension
+ * 2. An activation function (default: GELU)
+ * 3. Optional dropout for regularization
+ * 4. A second linear layer that projects from hidden dimension to output dimension
+ *
+ * This implementation follows the standard MLP architecture used in transformer models,
+ * typically applied after the attention mechanism in each transformer block.
+ */
 
 #pragma once
 

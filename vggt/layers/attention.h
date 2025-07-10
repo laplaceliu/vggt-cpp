@@ -1,7 +1,19 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @file attention.h
+ * @brief Attention layer implementation for vision transformers
+ *
+ * This file defines the Attention module which implements the multi-head self-attention
+ * mechanism used in vision transformers. It supports both standard and fused attention
+ * implementations, with optional query-key normalization.
+ *
+ * The module takes an input tensor and applies:
+ * 1. Linear projection to queries, keys and values
+ * 2. Optional layer normalization for queries and keys
+ * 3. Scaled dot-product attention
+ * 4. Linear projection of the output
+ *
+ * It supports both standard PyTorch implementation and fused attention kernels when available.
+ */
 
 #pragma once
 

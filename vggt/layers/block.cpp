@@ -1,7 +1,28 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @file block.cpp
+ * @brief Implementation of the Transformer block for vision transformers
+ *
+ * This file implements the BlockImpl class methods defined in block.h.
+ * It provides the core functionality for a standard transformer block,
+ * including:
+ *
+ * 1. Constructor for initializing the block with specified parameters
+ * 2. Forward method that implements the block computation logic
+ * 3. Layer normalization and residual connections
+ * 4. Multi-head self-attention and MLP operations
+ * 5. Optional layer scaling and drop path regularization
+ * 6. Training/inference mode handling
+ * 7. Efficient residual connection implementation
+ * 8. Module registration for PyTorch serialization
+ *
+ * The implementation follows the pre-norm architecture with optional
+ * stochastic depth (drop path) during training. Key features include:
+ * - Pre-layer normalization for improved training stability
+ * - Optional layer scaling (gamma parameters) for better optimization
+ * - Drop path regularization for improved generalization
+ * - Lambda functions for clean residual connection implementation
+ * - Support for both training and inference modes
+ */
 
 #include "block.h"
 

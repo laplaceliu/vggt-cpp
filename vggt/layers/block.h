@@ -1,7 +1,18 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-//
-// This source code is licensed under the Apache License, Version 2.0
-// found in the LICENSE file in the root directory of this source tree.
+/**
+ * @file block.h
+ * @brief Transformer block implementation for vision transformers
+ *
+ * This file defines the Block module which implements a standard transformer block
+ * used in vision transformers. Each block consists of:
+ *
+ * 1. Layer normalization followed by multi-head self-attention
+ * 2. Optional layer scaling and drop path for regularization
+ * 3. Layer normalization followed by MLP (feed-forward network)
+ * 4. Optional layer scaling and drop path for the MLP output
+ *
+ * The block follows the pre-norm architecture where normalization is applied
+ * before the attention and MLP operations, with residual connections around each.
+ */
 
 #pragma once
 
