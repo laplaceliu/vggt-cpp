@@ -1,6 +1,7 @@
 {
   "cSpell.words": [
     "Caffe",
+    "cgal",
     "CUBLAS",
     "CUDA",
     "CUDNN",
@@ -9,10 +10,14 @@
     "DOPENCV",
     "DWITH",
     "EIGEN",
+    "flann",
+    "gflags",
+    "glog",
     "googletest",
     "gtest",
     "NVCUVENC",
     "NVCUVID",
+    "openblas",
     "opencv",
     "Tensorpipe",
     "THIRDPARTY"
