@@ -1,7 +1,20 @@
 {
   "cSpell.words": [
     "Caffe",
+    "CUBLAS",
     "CUDA",
-    "Tensorpipe"
+    "CUDNN",
+    "DBUILD",
+    "DCMAKE",
+    "DOPENCV",
+    "DWITH",
+    "EIGEN",
+    "googletest",
+    "gtest",
+    "NVCUVENC",
+    "NVCUVID",
+    "opencv",
+    "Tensorpipe",
+    "THIRDPARTY"
   ]
 }
