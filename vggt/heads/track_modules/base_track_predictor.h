@@ -1,90 +1,98 @@
 /**
  * @file base_track_predictor.h
- * @brief Base tracker predictor for point tracking
+ * @brief Base tracker predictor implementation
  */
 
 #pragma once
 
 #include <torch/torch.h>
-#include "corr_block.h"
-#include "efficient_update_former.h"
+#include <vector>
+#include "blocks.h"
+#include "modules.h"
+#include "utils.h"
 
 namespace vggt {
-namespace track_modules {
 
-class BaseTrackerPredictorImpl : public torch::nn::Module {
+/**
+ * @brief Base tracker predictor class
+ */
+class BaseTrackerPredictor : public torch::nn::Module {
 public:
     /**
-     * @brief Construct a new BaseTrackerPredictorImpl object
+     * @brief Construct a new BaseTrackerPredictor object
      *
-     * @param hidden_dim Hidden dimension size
-     * @param corr_levels Number of correlation pyramid levels
-     * @param corr_radius Correlation search radius
-     * @param iters Number of refinement iterations
-     * @param multiple_track_feats Whether to split target features per level
-     * @param padding_mode Padding mode for sampling
+     * @param stride Feature map stride
+     * @param corr_levels Number of correlation levels
+     * @param corr_radius Correlation radius
+     * @param latent_dim Latent dimension size
+     * @param hidden_size Hidden size
+     * @param use_spaceatt Whether to use space attention
+     * @param depth Number of transformer blocks
+     * @param max_scale Maximum scale for flow embedding
+     * @param predict_conf Whether to predict confidence
      */
-    BaseTrackerPredictorImpl(
-        int64_t hidden_dim = 128,
-        int64_t corr_levels = 4,
-        int64_t corr_radius = 4,
-        int64_t iters = 3,
-        bool multiple_track_feats = false,
-        const std::string& padding_mode = "zeros");
+    BaseTrackerPredictor(
+        int stride = 1,
+        int corr_levels = 5,
+        int corr_radius = 4,
+        int latent_dim = 128,
+        int hidden_size = 384,
+        bool use_spaceatt = true,
+        int depth = 6,
+        int max_scale = 518,
+        bool predict_conf = true
+    );
 
     /**
-     * @brief Forward pass for point tracking
+     * @brief Forward pass
      *
-     * @param fmaps Feature maps (B, S, C, H, W)
-     * @param targets Target features (B, S, N, C)
-     * @param coords Initial coordinates (B, S, N, 2)
-     * @param visibility Initial visibility (B, S, N, 1)
-     * @param confidence Initial confidence (B, S, N, 1)
-     * @param mask Mask for valid points (B, S, N)
-     * @return std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-     *         Predicted coordinates, visibility, and confidence
+     * @param query_points Query points tensor [B, N, 2]
+     * @param fmaps Feature maps tensor [B, S, C, HH, WW]
+     * @param iters Number of refinement iterations
+     * @param return_feat Whether to return features
+     * @param down_ratio Downsampling ratio
+     * @param apply_sigmoid Whether to apply sigmoid to outputs
+     * @return std::tuple containing:
+     *         - coord_preds: List of coordinate predictions
+     *         - vis_e: Visibility predictions
+     *         - track_feats: Track features (if return_feat=true)
+     *         - query_track_feat: Query track features (if return_feat=true)
+     *         - conf_e: Confidence predictions (if predict_conf=true)
      */
-    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> forward(
-        const torch::Tensor& fmaps,
-        const torch::Tensor& targets,
-        const torch::Tensor& coords,
-        const torch::Tensor& visibility = {},
-        const torch::Tensor& confidence = {},
-        const torch::Tensor& mask = {});
+    std::tuple<
+        std::vector<torch::Tensor>,  // coord_preds
+        torch::Tensor,               // vis_e
+        torch::Tensor,               // track_feats (optional)
+        torch::Tensor,               // query_track_feat (optional)
+        torch::Tensor                // conf_e (optional)
+    > forward(
+        torch::Tensor query_points,
+        torch::Tensor fmaps,
+        int iters = 6,
+        bool return_feat = false,
+        int down_ratio = 1,
+        bool apply_sigmoid = true
+    );
 
 private:
-    int64_t hidden_dim_;
-    int64_t corr_levels_;
-    int64_t corr_radius_;
-    int64_t iters_;
-    bool multiple_track_feats_;
-    std::string padding_mode_;
+    int stride;
+    int latent_dim;
+    int corr_levels;
+    int corr_radius;
+    int hidden_size;
+    int max_scale;
+    bool predict_conf;
+    int flows_emb_dim;
+    int transformer_dim;
 
-    // Network components
-    EfficientUpdateFormer update_block_{nullptr};
-    torch::nn::Linear corr_embed_{nullptr};
-    torch::nn::Linear flow_embed_{nullptr};
-    torch::nn::Linear vis_embed_{nullptr};
-    torch::nn::Linear conf_embed_{nullptr};
-    torch::nn::Linear coord_predictor_{nullptr};
-    torch::nn::Linear vis_predictor_{nullptr};
-    torch::nn::Linear conf_predictor_{nullptr};
-
-    /**
-     * @brief Generate 2D position embeddings
-     *
-     * @param coords Coordinates (B, S, N, 2)
-     * @param H Feature height
-     * @param W Feature width
-     * @return torch::Tensor Position embeddings (B, S, N, hidden_dim)
-     */
-    torch::Tensor get_2d_embedding(
-        const torch::Tensor& coords,
-        int64_t H,
-        int64_t W);
+    torch::nn::LayerNorm fmap_norm{nullptr};
+    torch::nn::GroupNorm ffeat_norm{nullptr};
+    torch::nn::Sequential corr_mlp{nullptr};
+    torch::nn::Sequential ffeat_updater{nullptr};
+    torch::nn::Sequential vis_predictor{nullptr};
+    torch::nn::Sequential conf_predictor{nullptr};
+    EfficientUpdateFormer updateformer{nullptr};
+    torch::Tensor query_ref_token;
 };
 
-TORCH_MODULE(BaseTrackerPredictor);
-
-} // namespace track_modules
 } // namespace vggt
