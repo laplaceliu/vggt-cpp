@@ -471,6 +471,12 @@ else
             build_eigen_master
         elif [ $param = "boost" ]; then
             build_boost
+        elif [ $param = "mpfr" ]; then
+            build_mpfr
+        elif [ $param = "cgal" ]; then
+            build_cgal
+        elif [ $param = "flann" ]; then
+            build_flann
         elif [ $param = "metis" ]; then
             build_metis
         elif [ $param = "poselib" ]; then
