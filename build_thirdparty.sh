@@ -5,6 +5,27 @@ DEPENDENCIES_INSTALL_DIR=$(pwd)/dependencies
 export CMAKE_LIBRARY_PATH=$DEPENDENCIES_INSTALL_DIR/lib:$CMAKE_LIBRARY_PATH
 export CMAKE_INCLUDE_PATH=$DEPENDENCIES_INSTALL_DIR/include:$CMAKE_INCLUDE_PATH
 
+build_argparse() {
+    TMP_DIR=$(mktemp -d)
+
+    NAME=argparse-3.2
+    SOURCE=$NAME.tar.gz
+    tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
+
+    pushd $TMP_DIR/$NAME
+    mkdir build && cd build
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_BUILD_TYPE=MinSizeRel \
+        -DARGPARSE_BUILD_SAMPLES=off \
+        -DARGPARSE_BUILD_TESTS=off
+
+    make -j
+    make install
+    popd
+
+    rm -rf $TMP_DIR
+}
 build_cgal() {
     TMP_DIR=$(mktemp -d)
 
@@ -465,7 +486,9 @@ if [ $# -eq 0 ]; then
     default
 else
     for param in "$@"; do
-        if [ $param = "eigen" ]; then
+        if [ $param = "argparse" ]; then
+            build_argparse
+        elif [ $param = "eigen" ]; then
             build_eigen
         elif [ $param = "eigen_master" ]; then
             build_eigen_master
