@@ -1,70 +1,119 @@
 /**
- * @brief 2D Rotary Position Embeddings (RoPE) for vision transformers
+ * @file rope.h
+ * @brief 2D Rotary Position Embeddings (RoPE) implementation
  *
  * This file defines classes for implementing 2D Rotary Position Embeddings,
- * which provide a way to encode spatial position information into transformer
- * attention mechanisms. RoPE enables the model to be aware of the relative
- * positions of image patches in both horizontal and vertical dimensions.
- *
- * The implementation includes:
- * 1. PositionGetter class for generating spatial position coordinates
- * 2. RotaryPositionEmbedding2D class that applies rotary embeddings to token features
- * 3. Efficient caching mechanisms to avoid redundant computations
- * 4. Support for configurable frequency and scaling parameters
- *
- * Rotary Position Embeddings offer several advantages over traditional positional
- * encodings, including better generalization to sequence lengths not seen during
- * training and more effective modeling of relative positions between tokens.
- * This implementation extends the original 1D RoPE to handle 2D spatial positions
- * for vision tasks.
+ * which extends the original RoPE concept to handle 2D spatial positions.
  */
 
 #pragma once
 
-#include <map>
-#include <utility>
-#include <vector>
-#include <memory>
-#include "Eigen/Dense"
+#include <torch/torch.h>
+#include <unordered_map>
+#include <tuple>
 
+namespace vggt {
+namespace layers {
+
+/**
+ * @brief Generates and caches 2D spatial positions for patches in a grid
+ * 
+ * This class efficiently manages the generation of spatial coordinates for patches
+ * in a 2D grid, caching results to avoid redundant computations.
+ */
 class PositionGetter {
 public:
+    /**
+     * @brief Initializes the position generator with an empty cache
+     */
     PositionGetter();
 
-    // Generates spatial positions for a batch of patches
-    // Returns tensor of shape (batch_size, height*width, 2)
-    Eigen::Tensor<float, 3> operator()(int batch_size, int height, int width);
+    /**
+     * @brief Generates spatial positions for a batch of patches
+     * 
+     * @param batch_size Number of samples in the batch
+     * @param height Height of the grid in patches
+     * @param width Width of the grid in patches
+     * @param device Target device for the position tensor
+     * @return Tensor of shape (batch_size, height*width, 2) containing y,x coordinates
+     */
+    torch::Tensor operator()(int64_t batch_size, int64_t height, int64_t width, torch::Device device);
 
 private:
-    std::map<std::pair<int, int>, Eigen::Tensor<float, 2>> position_cache_;
+    // Cache for position tensors, keyed by (height, width)
+    std::unordered_map<std::string, torch::Tensor> position_cache_;
 };
 
-class RotaryPositionEmbedding2D {
+/**
+ * @brief 2D Rotary Position Embedding implementation
+ * 
+ * This module applies rotary position embeddings to input tokens based on their
+ * 2D spatial positions. It handles the position-dependent rotation of features
+ * separately for vertical and horizontal dimensions.
+ */
+class RotaryPositionEmbedding2DImpl : public torch::nn::Module {
 public:
-    RotaryPositionEmbedding2D(float frequency = 100.0f, float scaling_factor = 1.0f);
+    /**
+     * @brief Initializes the 2D RoPE module
+     * 
+     * @param frequency Base frequency for the position embeddings (default: 100.0)
+     * @param scaling_factor Scaling factor for frequency computation (default: 1.0)
+     */
+    RotaryPositionEmbedding2DImpl(double frequency = 100.0, double scaling_factor = 1.0);
 
-    // Applies 2D rotary position embeddings to input tokens
-    // tokens shape: (batch_size, n_heads, n_tokens, dim)
-    // positions shape: (batch_size, n_tokens, 2)
-    Eigen::Tensor<float, 4> forward(const Eigen::Tensor<float, 4>& tokens,
-                                  const Eigen::Tensor<float, 3>& positions);
+    /**
+     * @brief Applies 2D rotary position embeddings to input tokens
+     * 
+     * @param tokens Input tensor of shape (batch_size, n_heads, n_tokens, dim)
+     * @param positions Position tensor of shape (batch_size, n_tokens, 2)
+     * @return Tensor with applied 2D rotary position embeddings
+     */
+    torch::Tensor forward(const torch::Tensor& tokens, const torch::Tensor& positions);
 
 private:
-    // Computes frequency components for rotary embeddings
-    std::pair<Eigen::Tensor<float, 2>, Eigen::Tensor<float, 2>>
-    compute_frequency_components(int dim, int seq_len);
+    /**
+     * @brief Computes frequency components for rotary embeddings
+     * 
+     * @param dim Feature dimension (must be even)
+     * @param seq_len Maximum sequence length
+     * @param device Target device for computations
+     * @param dtype Data type for the computed tensors
+     * @return Tuple of (cosine, sine) tensors for frequency components
+     */
+    std::tuple<torch::Tensor, torch::Tensor> compute_frequency_components(
+        int64_t dim, int64_t seq_len, torch::Device device, torch::ScalarType dtype);
 
-    // Performs feature rotation
-    Eigen::Tensor<float, 4> rotate_features(const Eigen::Tensor<float, 4>& x);
+    /**
+     * @brief Performs feature rotation by splitting and recombining feature dimensions
+     * 
+     * @param x Input tensor to rotate
+     * @return Rotated feature tensor
+     */
+    torch::Tensor rotate_features(const torch::Tensor& x);
 
-    // Applies 1D rotary position embeddings
-    Eigen::Tensor<float, 4> apply_1d_rope(const Eigen::Tensor<float, 4>& tokens,
-                                         const Eigen::Tensor<float, 3>& positions,
-                                         const Eigen::Tensor<float, 2>& cos_comp,
-                                         const Eigen::Tensor<float, 2>& sin_comp);
+    /**
+     * @brief Applies 1D rotary position embeddings along one dimension
+     * 
+     * @param tokens Input token features
+     * @param positions Position indices
+     * @param cos_comp Cosine components for rotation
+     * @param sin_comp Sine components for rotation
+     * @return Tokens with applied rotary position embeddings
+     */
+    torch::Tensor apply_1d_rope(
+        const torch::Tensor& tokens,
+        const torch::Tensor& positions,
+        const torch::Tensor& cos_comp,
+        const torch::Tensor& sin_comp);
 
-    float base_frequency_;
-    float scaling_factor_;
-    std::map<std::tuple<int, int>,
-             std::pair<Eigen::Tensor<float, 2>, Eigen::Tensor<float, 2>>> frequency_cache_;
+    double base_frequency_;
+    double scaling_factor_;
+    
+    // Cache for frequency components, keyed by (dim, seq_len, device, dtype)
+    std::unordered_map<std::string, std::tuple<torch::Tensor, torch::Tensor>> frequency_cache_;
 };
+
+TORCH_MODULE(RotaryPositionEmbedding2D);
+
+} // namespace layers
+} // namespace vggt

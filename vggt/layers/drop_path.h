@@ -1,17 +1,16 @@
 /**
- * @brief Drop path (Stochastic Depth) regularization for vision transformers
+ * @file drop_path.h
+ * @brief Drop path (stochastic depth) implementation for vision transformers
  *
- * This file defines the DropPath module which implements stochastic depth
- * regularization as described in "Deep Networks with Stochastic Depth"
- * (Huang et al., 2016). This technique randomly drops entire layers during
- * training to improve generalization and reduce overfitting.
+ * This file defines the DropPath module which implements stochastic depth regularization
+ * technique used in vision transformers. It randomly drops entire paths (channels) during
+ * training to improve generalization.
  *
- * The implementation includes:
- * 1. A standalone drop_path function that can be applied to any tensor
- * 2. A DropPathImpl module class that can be integrated into neural network architectures
+ * The module takes an input tensor and applies:
+ * 1. During training: randomly zeroes entire channels with probability drop_prob
+ * 2. During inference: passes the input unchanged
  *
- * During inference (when training=false), this module acts as an identity function.
- * During training, it randomly drops entire paths (channels) with probability drop_prob.
+ * This is particularly useful when applied in the main path of residual blocks.
  */
 
 #pragma once
@@ -21,12 +20,17 @@
 namespace vggt {
 namespace layers {
 
+/**
+ * Drop paths (Stochastic Depth) per sample when applied in main path of residual blocks
+ */
 torch::Tensor drop_path(
-    torch::Tensor x,
+    const torch::Tensor& x,
     double drop_prob = 0.0,
+    bool training = false);
+
 class DropPathImpl : public torch::nn::Module {
 public:
-    explicit DropPathImpl(double drop_prob = 0.0);
+    DropPathImpl(double drop_prob = 0.0);
 
     torch::Tensor forward(const torch::Tensor& x);
 
