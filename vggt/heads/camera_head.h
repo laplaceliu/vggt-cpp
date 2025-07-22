@@ -38,7 +38,7 @@ private:
     torch::nn::Linear embed_pose;
     torch::nn::Sequential poseLN_modulation;
     torch::nn::LayerNorm adaln_norm;
-    Mlp pose_branch;
+    layers::Mlp pose_branch;
 };
 TORCH_MODULE(CameraHead);
 
