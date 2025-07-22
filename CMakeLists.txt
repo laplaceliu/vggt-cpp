@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(vggt)
+project(vggt-cpp)
 
 if(POLICY CMP0146)
     cmake_policy(SET CMP0146 OLD)
@@ -39,6 +39,11 @@ include_directories(
 })
 
 ################################################################################
+# 添加vggt子目录
+################################################################################
+add_subdirectory(vggt)
+
+################################################################################
 # ${PROJECT_NAME}
 ################################################################################
 # 源文件
@@ -49,6 +54,7 @@ add_executable(demo_vggt
 # 链接库
 target_link_libraries(demo_vggt
     PRIVATE
+    vggt
     pthread
     ${TORCH_LIBRARIES}
 )
