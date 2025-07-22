@@ -229,14 +229,14 @@ private:
     bool use_reentrant_;
     bool chunked_blocks_;
 
-    PatchEmbed patch_embed_{nullptr};
-    torch::nn::ParameterList cls_token_{nullptr};
-    torch::nn::ParameterList pos_embed_{nullptr};
-    torch::nn::ParameterList register_tokens_{nullptr};
-    torch::nn::ModuleList blocks_{nullptr};
-    torch::nn::LayerNorm norm_{nullptr};
-    torch::nn::Module head_{nullptr};
-    torch::nn::ParameterList mask_token_{nullptr};
+    PatchEmbed patch_embed_;
+    torch::nn::ParameterList cls_token_;
+    torch::nn::ParameterList pos_embed_;
+    torch::nn::ParameterList register_tokens_;
+    torch::nn::ModuleList blocks_;
+    torch::nn::LayerNorm norm_;
+    torch::nn::Module head_;
+    torch::nn::ParameterList mask_token_;
 };
 
 TORCH_MODULE(DinoVisionTransformer);

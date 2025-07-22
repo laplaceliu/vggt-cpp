@@ -60,8 +60,8 @@ private:
     std::string padding_mode_;
 
     // Network components
-    DPTHead feature_extractor_{nullptr};
-    track_modules::BaseTrackerPredictor tracker_predictor_{nullptr};
+    DPTHead feature_extractor_;
+    track_modules::BaseTrackerPredictor tracker_predictor_;
 };
 
 TORCH_MODULE(TrackHead);

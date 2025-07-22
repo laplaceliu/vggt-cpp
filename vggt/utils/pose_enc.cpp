@@ -1,91 +1,69 @@
-/**
- * @file pose_enc.cpp
- * @brief Implementation of camera pose encoding utility functions for VGGT
- */
+
 
 #include "pose_enc.h"
-#include <torch/torch.h>
+#include "rotation.h"
 
 namespace vggt {
 namespace utils {
 
 torch::Tensor extri_intri_to_pose_encoding(
     const torch::Tensor& extrinsics,
-    const torch::Tensor& intrinsics) {
+    const torch::Tensor& intrinsics,
+    const std::pair<int, int>& image_size_hw,
+    const std::string& pose_encoding_type
+) {
+    if (pose_encoding_type == "absT_quaR_FoV") {
+        auto R = extrinsics.slice(-1, 0, 3).slice(-2, 0, 3); // BxSx3x3
+        auto T = extrinsics.slice(-1, 3).slice(-2, 0, 3);     // BxSx3
 
-    // Extract rotation and translation from extrinsics
-    auto R = extrinsics.narrow(1, 0, 3).narrow(2, 0, 3);  // [B, 3, 3]
-    auto t = extrinsics.narrow(1, 0, 3).narrow(2, 3, 1);  // [B, 3, 1]
-
-    // Extract focal length and principal point from intrinsics
-    auto fx = intrinsics.index({Ellipsis, 0, 0}).unsqueeze(-1);  // [B, 1]
-    auto fy = intrinsics.index({Ellipsis, 1, 1}).unsqueeze(-1);  // [B, 1]
-    auto cx = intrinsics.index({Ellipsis, 0, 2}).unsqueeze(-1);  // [B, 1]
-    auto cy = intrinsics.index({Ellipsis, 1, 2}).unsqueeze(-1);  // [B, 1]
-
-    // Flatten rotation matrix
-    auto R_flat = R.reshape({R.size(0), 9});  // [B, 9]
-
-    // Flatten translation vector
-    auto t_flat = t.reshape({t.size(0), 3});  // [B, 3]
-
-    // Concatenate all components to form pose encoding
-    auto pose_encoding = torch::cat({R_flat, t_flat, fx, fy, cx, cy}, 1);  // [B, 16]
-
-    return pose_encoding;
+        auto quat = mat_to_quat(R);
+        auto H = image_size_hw.first;
+        auto W = image_size_hw.second;
+        auto fov_h = 2 * torch::atan((H / 2.0) / intrinsics.index({torch::indexing::Ellipsis, 1, 1}));
+        auto fov_w = 2 * torch::atan((W / 2.0) / intrinsics.index({torch::indexing::Ellipsis, 0, 0}));
+        auto pose_encoding = torch::cat({T, quat, fov_h.unsqueeze(-1), fov_w.unsqueeze(-1)}, -1).to(torch::kFloat);
+        return pose_encoding;
+    } else {
+        throw std::runtime_error("Unsupported pose encoding type: " + pose_encoding_type);
+    }
 }
 
 std::tuple<torch::Tensor, torch::Tensor> pose_encoding_to_extri_intri(
-    const torch::Tensor& pose_encoding) {
+    const torch::Tensor& pose_encoding,
+    const std::pair<int, int>& image_size_hw,
+    const std::string& pose_encoding_type,
+    bool build_intrinsics
+) {
+    torch::Tensor intrinsics;
 
-    auto batch_size = pose_encoding.size(0);
-    auto device = pose_encoding.device();
+    if (pose_encoding_type == "absT_quaR_FoV") {
+        auto T = pose_encoding.slice(-1, 0, 3);
+        auto quat = pose_encoding.slice(-1, 3, 7);
+        auto fov_h = pose_encoding.slice(-1, 7);
+        auto fov_w = pose_encoding.slice(-1, 8);
 
-    // Extract components from pose encoding
-    auto R_flat = pose_encoding.narrow(1, 0, 9);  // [B, 9]
-    auto t_flat = pose_encoding.narrow(1, 9, 3);  // [B, 3]
-    auto fx = pose_encoding.narrow(1, 12, 1);  // [B, 1]
-    auto fy = pose_encoding.narrow(1, 13, 1);  // [B, 1]
-    auto cx = pose_encoding.narrow(1, 14, 1);  // [B, 1]
-    auto cy = pose_encoding.narrow(1, 15, 1);  // [B, 1]
+        auto R = quat_to_mat(quat);
+        auto extrinsics = torch::cat({R, T.unsqueeze(-1)}, -1);
 
-    // Reshape rotation matrix
-    auto R = R_flat.reshape({batch_size, 3, 3});  // [B, 3, 3]
-
-    // Reshape translation vector
-    auto t = t_flat.reshape({batch_size, 3, 1});  // [B, 3, 1]
-
-    // Create extrinsics matrix
-    auto extrinsics = torch::zeros({batch_size, 4, 4},
-                                  torch::TensorOptions().device(device).dtype(pose_encoding.dtype()));
-
-    // Set rotation part
-    extrinsics.narrow(1, 0, 3).narrow(2, 0, 3) = R;
-
-    // Set translation part
-    extrinsics.narrow(1, 0, 3).narrow(2, 3, 1) = t;
-
-    // Set bottom row to [0, 0, 0, 1]
-    extrinsics.narrow(1, 3, 1).narrow(2, 0, 3).zero_();
-    extrinsics.narrow(1, 3, 1).narrow(2, 3, 1).fill_(1.0);
-
-    // Create intrinsics matrix
-    auto intrinsics = torch::zeros({batch_size, 3, 3},
-                                  torch::TensorOptions().device(device).dtype(pose_encoding.dtype()));
-
-    // Set focal length
-    intrinsics.index_put_({torch::arange(batch_size), 0, 0}, fx.squeeze(-1));
-    intrinsics.index_put_({torch::arange(batch_size), 1, 1}, fy.squeeze(-1));
-
-    // Set principal point
-    intrinsics.index_put_({torch::arange(batch_size), 0, 2}, cx.squeeze(-1));
-    intrinsics.index_put_({torch::arange(batch_size), 1, 2}, cy.squeeze(-1));
-
-    // Set [0, 0, 1] in bottom row
-    intrinsics.index_put_({torch::arange(batch_size), 2, 2}, torch::ones({batch_size},
-                         torch::TensorOptions().device(device).dtype(pose_encoding.dtype())));
-
-    return std::make_tuple(extrinsics, intrinsics);
+        if (build_intrinsics) {
+            auto H = image_size_hw.first;
+            auto W = image_size_hw.second;
+            auto fy = (H / 2.0) / torch::tan(fov_h / 2.0);
+            auto fx = (W / 2.0) / torch::tan(fov_w / 2.0);
+            intrinsics = torch::zeros(
+                torch::IntArrayRef(pose_encoding.sizes().begin(), pose_encoding.sizes().end() - 1) + std::initializer_list<int64_t>{3, 3},
+                pose_encoding.options()
+            );
+            intrinsics.index_put_({torch::indexing::Ellipsis, 0, 0}, fx);
+            intrinsics.index_put_({torch::indexing::Ellipsis, 1, 1}, fy);
+            intrinsics.index_put_({torch::indexing::Ellipsis, 0, 2}, W / 2.0);
+            intrinsics.index_put_({torch::indexing::Ellipsis, 1, 2}, H / 2.0);
+            intrinsics.index_put_({torch::indexing::Ellipsis, 2, 2}, 1.0);
+        }
+        return {extrinsics, intrinsics};
+    } else {
+        throw std::runtime_error("Unsupported pose encoding type: " + pose_encoding_type);
+    }
 }
 
 } // namespace utils

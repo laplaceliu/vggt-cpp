@@ -156,7 +156,7 @@ torch::Tensor bilinear_sampler(
     if (ndim == 5) {
         // t x y -> x y t to match dimensions T H W in grid_sample
         coords = coords.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(),
-                              torch::indexing::Tensor({1, 2, 0})});
+                              Tensor({1, 2, 0})});
     }
 
     std::vector<float> scale_factors;

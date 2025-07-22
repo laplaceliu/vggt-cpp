@@ -28,6 +28,7 @@
     "relu",
     "Tensorpipe",
     "THIRDPARTY",
+    "vggsfm",
     "vggt"
   ],
   "files.associations": {
@@ -43,6 +44,9 @@
     "regex": "cpp",
     "utility": "cpp",
     "valarray": "cpp",
-    "new": "cpp"
+    "new": "cpp",
+    "rope": "cpp",
+    "variant": "cpp",
+    "chrono": "cpp"
   }
 }

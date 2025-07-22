@@ -45,14 +45,14 @@ public:
     torch::Tensor forward(const torch::Tensor& x, const torch::Tensor& pos = {});
 
 private:
-    torch::nn::LayerNorm norm1{nullptr};
-    Attention attn{nullptr};
-    LayerScale ls1{nullptr};
-    DropPath drop_path1{nullptr};
-    torch::nn::LayerNorm norm2{nullptr};
-    Mlp mlp{nullptr};
-    LayerScale ls2{nullptr};
-    DropPath drop_path2{nullptr};
+    torch::nn::LayerNorm norm1;
+    Attention attn;
+    LayerScale ls1;
+    DropPath drop_path1;
+    torch::nn::LayerNorm norm2;
+    Mlp mlp;
+    LayerScale ls2;
+    DropPath drop_path2;
     double sample_drop_ratio;
 };
 

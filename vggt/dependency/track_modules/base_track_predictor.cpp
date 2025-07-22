@@ -125,12 +125,12 @@ BaseTrackerPredictor::forward(
         auto fcorrs_ = fcorrs.permute({0, 2, 1, 3}).reshape({B * N, S, corrdim});
 
         // Compute flows (movement relative to query points)
-        auto flows = (coords - coords.index({torch::indexing::Slice(), {0, 1}}))
+        auto flows = (coords - coords.index(torch::indexing::Slice()).index({0, 1}))
                     .permute({0, 2, 1, 3}).reshape({B * N, S, 2});
 
         // Get flow embeddings
         auto flows_emb = get_2d_embedding(flows, flows_emb_dim, false);
-        flows_emb = torch::cat({flows_emb, flows}, 2);
+        flows_emb = torch::cat(std::vector<at::Tensor>{flows_emb, flows}, 2);
 
         // Reshape track features
         auto track_feats_ = track_feats.permute({0, 2, 1, 3}).reshape({B * N, S, latent_dim});

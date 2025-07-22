@@ -13,9 +13,11 @@
 
 #pragma once
 
+#include <torch/torch.h>
 #include <torch/nn/module.h>
 #include <torch/nn/modules/conv.h>
 #include <torch/nn/modules/normalization.h>
+#include <torch/nn/modules/container/any.h>
 #include <tuple>
 
 namespace vggt {
@@ -71,7 +73,7 @@ private:
     int64_t embed_dim_;
     bool flatten_embedding_;
 
-    torch::nn::Conv2d proj{nullptr};
+    torch::nn::Conv2d proj;
     torch::nn::AnyModule norm;
 };
 

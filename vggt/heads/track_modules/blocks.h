@@ -62,16 +62,16 @@ private:
     bool add_space_attn;
     int num_virtual_tracks;
 
-    torch::nn::LayerNorm input_norm{nullptr};
-    torch::nn::Linear input_transform{nullptr};
-    torch::nn::LayerNorm output_norm{nullptr};
-    torch::nn::Linear flow_head{nullptr};
+    torch::nn::LayerNorm input_norm;
+    torch::nn::Linear input_transform;
+    torch::nn::LayerNorm output_norm;
+    torch::nn::Linear flow_head;
 
     torch::Tensor virual_tracks;
-    torch::nn::ModuleList time_blocks{nullptr};
-    torch::nn::ModuleList space_virtual_blocks{nullptr};
-    torch::nn::ModuleList space_point2virtual_blocks{nullptr};
-    torch::nn::ModuleList space_virtual2point_blocks{nullptr};
+    torch::nn::ModuleList time_blocks;
+    torch::nn::ModuleList space_virtual_blocks;
+    torch::nn::ModuleList space_point2virtual_blocks;
+    torch::nn::ModuleList space_virtual2point_blocks;
 };
 
 /**

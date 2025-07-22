@@ -5,20 +5,21 @@
 #include <torch/torch.h>
 #include <memory>
 #include <string>
+#include <tuple>
 
 namespace vggt {
 
 /**
- * @brief C++ implementation of the VGGSfM tracker from Python
+ * @brief C++ implementation of the TrackerPredictor class from Python
  *
  * This class is responsible for predicting tracks in a sequence of images.
  */
-class VGGSfMTracker : public torch::nn::Module {
+class TrackerPredictor : public torch::nn::Module {
 public:
     /**
-     * @brief Construct a new VGGSfMTracker object
+     * @brief Construct a new Tracker Predictor object
      */
-    VGGSfMTracker();
+    TrackerPredictor();
 
     /**
      * @brief Load model weights from a file
@@ -28,7 +29,15 @@ public:
     void load(const std::string& model_path);
 
     /**
-     * @brief Forward pass of the tracker
+     * @brief Process images to feature maps
+     *
+     * @param images Images tensor with shape [S, 3, H, W]
+     * @return torch::Tensor Feature maps
+     */
+    torch::Tensor process_images_to_fmaps(const torch::Tensor& images);
+
+    /**
+     * @brief Forward pass of the tracker predictor
      *
      * @param images Images tensor with shape [B, S, 3, H, W]
      * @param query_points Query points tensor with shape [B, N, 2]
@@ -49,14 +58,6 @@ public:
         int coarse_iters = 6,
         bool inference = true
     );
-
-    /**
-     * @brief Process images to feature maps
-     *
-     * @param images Images tensor with shape [S, 3, H, W]
-     * @return torch::Tensor Feature maps
-     */
-    torch::Tensor process_images_to_fmaps(const torch::Tensor& images);
 
 private:
     // Coarse predictor components
