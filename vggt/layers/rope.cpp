@@ -1,202 +1,132 @@
 /**
+ * @file rope.cpp
  * @brief Implementation of 2D Rotary Position Embeddings (RoPE)
  *
- * This file implements the methods defined in rope.h for 2D Rotary Position
- * Embeddings used in vision transformers. It provides the core functionality
- * for encoding spatial position information into transformer attention mechanisms.
- *
- * The implementation includes:
- * 1. PositionGetter class implementation that generates and caches 2D spatial
- *    coordinates for image patches
- * 2. RotaryPositionEmbedding2D class implementation that applies rotary embeddings
- *    to token features based on their spatial positions
- * 3. Efficient computation and caching of frequency components
- * 4. Separate application of rotary embeddings for vertical and horizontal dimensions
- * 5. Feature rotation operations that implement the core RoPE mechanism
- *
- * The implementation uses Eigen tensors for efficient numerical operations and
- * includes caching mechanisms to avoid redundant computations across multiple
- * forward passes with the same dimensions.
+ * This file implements the PositionGetter and RotaryPositionEmbedding2D classes
+ * defined in rope.h, providing functionality for 2D rotary position embeddings.
  */
 
 #include "rope.h"
-#include <cmath>
-#include <iostream>
+#include <sstream>
 
-using namespace Eigen;
+namespace vggt {
+namespace layers {
 
 PositionGetter::PositionGetter() {}
 
-Eigen::Tensor<float, 3> PositionGetter::operator()(int batch_size, int height, int width) {
-    auto key = std::make_pair(height, width);
-    if (position_cache_.find(key) == position_cache_.end()) {
-        // Generate y and x coordinates
-        Tensor<float, 1> y_coords = Tensor<float, 1>(height);
-        Tensor<float, 1> x_coords = Tensor<float, 1>(width);
-        for (int i = 0; i < height; ++i) y_coords(i) = static_cast<float>(i);
-        for (int i = 0; i < width; ++i) x_coords(i) = static_cast<float>(i);
+torch::Tensor PositionGetter::operator()(int64_t batch_size, int64_t height, int64_t width, torch::Device device) {
+    // Create a cache key from height and width
+    std::stringstream key_stream;
+    key_stream << height << "_" << width;
+    std::string cache_key = key_stream.str();
 
-        // Create cartesian product of positions
-        Tensor<float, 2> positions(height * width, 2);
-        int idx = 0;
-        for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
-                positions(idx, 0) = y_coords(y);
-                positions(idx, 1) = x_coords(x);
-                idx++;
+    // Check if positions for this grid size are already cached
+    if (position_cache_.find(cache_key) == position_cache_.end()) {
+        // Generate y and x coordinates
+        auto y_coords = torch::arange(height, device);
+        auto x_coords = torch::arange(width, device);
+        
+        // Create cartesian product of coordinates
+        std::vector<torch::Tensor> positions_list;
+        for (int64_t y = 0; y < height; ++y) {
+            for (int64_t x = 0; x < width; ++x) {
+                positions_list.push_back(torch::tensor({y, x}, device));
             }
         }
-        position_cache_[key] = positions;
+        
+        // Stack tensors to create positions tensor
+        auto positions = torch::stack(positions_list);
+        position_cache_[cache_key] = positions;
     }
 
-    // Expand for batch size
-    auto cached_positions = position_cache_[key];
-    Tensor<float, 3> result(batch_size, height * width, 2);
-    for (int b = 0; b < batch_size; ++b) {
-        for (int i = 0; i < height * width; ++i) {
-            result(b, i, 0) = cached_positions(i, 0);
-            result(b, i, 1) = cached_positions(i, 1);
-        }
-    }
-    return result;
+    // Get cached positions and expand for batch
+    auto cached_positions = position_cache_[cache_key];
+    return cached_positions.view({1, height * width, 2}).expand({batch_size, -1, -1}).clone();
 }
 
-RotaryPositionEmbedding2D::RotaryPositionEmbedding2D(float frequency, float scaling_factor)
+RotaryPositionEmbedding2DImpl::RotaryPositionEmbedding2DImpl(double frequency, double scaling_factor)
     : base_frequency_(frequency), scaling_factor_(scaling_factor) {}
 
-std::pair<Eigen::Tensor<float, 2>, Eigen::Tensor<float, 2>>
-RotaryPositionEmbedding2D::compute_frequency_components(int dim, int seq_len) {
-    auto key = std::make_tuple(dim, seq_len);
-    if (frequency_cache_.find(key) == frequency_cache_.end()) {
+std::tuple<torch::Tensor, torch::Tensor> RotaryPositionEmbedding2DImpl::compute_frequency_components(
+    int64_t dim, int64_t seq_len, torch::Device device, torch::ScalarType dtype) {
+    
+    // Create a cache key
+    std::stringstream key_stream;
+    key_stream << dim << "_" << seq_len << "_" << device << "_" << dtype;
+    std::string cache_key = key_stream.str();
+
+    // Check if frequency components are already cached
+    if (frequency_cache_.find(cache_key) == frequency_cache_.end()) {
         // Compute frequency bands
-        Tensor<float, 1> exponents(dim / 2);
-        Tensor<float, 1> inv_freq(dim / 2);
-        for (int i = 0; i < dim / 2; ++i) {
-            exponents(i) = static_cast<float>(i) / dim;
-            inv_freq(i) = 1.0f / std::pow(base_frequency_, exponents(i));
-        }
+        auto exponents = torch::arange(0, dim, 2, device).to(torch::kFloat32) / dim;
+        auto inv_freq = 1.0 / torch::pow(torch::tensor(base_frequency_, device), exponents);
 
         // Generate position-dependent frequencies
-        Tensor<float, 2> angles(seq_len, dim / 2);
-        for (int i = 0; i < seq_len; ++i) {
-            for (int j = 0; j < dim / 2; ++j) {
-                angles(i, j) = static_cast<float>(i) * inv_freq(j);
-            }
-        }
+        auto positions = torch::arange(seq_len, device).to(inv_freq.dtype());
+        auto angles = torch::einsum("i,j->ij", {positions, inv_freq});
 
-        // Compute cosine and sine components
-        Tensor<float, 2> cos_comp = angles.cos();
-        Tensor<float, 2> sin_comp = angles.sin();
-
-        // Duplicate for full dimension
-        Tensor<float, 2> full_cos(seq_len, dim);
-        Tensor<float, 2> full_sin(seq_len, dim);
-        for (int i = 0; i < seq_len; ++i) {
-            for (int j = 0; j < dim / 2; ++j) {
-                full_cos(i, j) = cos_comp(i, j);
-                full_cos(i, j + dim / 2) = cos_comp(i, j);
-                full_sin(i, j) = sin_comp(i, j);
-                full_sin(i, j + dim / 2) = sin_comp(i, j);
-            }
-        }
-
-        frequency_cache_[key] = std::make_pair(full_cos, full_sin);
+        // Compute and cache frequency components
+        angles = angles.to(dtype);
+        angles = torch::cat({angles, angles}, -1);
+        auto cos_components = angles.cos().to(dtype);
+        auto sin_components = angles.sin().to(dtype);
+        
+        frequency_cache_[cache_key] = std::make_tuple(cos_components, sin_components);
     }
-    return frequency_cache_[key];
+
+    return frequency_cache_[cache_key];
 }
 
-Eigen::Tensor<float, 4> RotaryPositionEmbedding2D::rotate_features(const Eigen::Tensor<float, 4>& x) {
-    int feature_dim = x.dimension(3);
-    Tensor<float, 4> result = x;
-
-    // Split and rotate features
-    for (int b = 0; b < x.dimension(0); ++b) {
-        for (int h = 0; h < x.dimension(1); ++h) {
-            for (int t = 0; t < x.dimension(2); ++t) {
-                for (int d = 0; d < feature_dim / 2; ++d) {
-                    float x1 = x(b, h, t, d);
-                    float x2 = x(b, h, t, d + feature_dim / 2);
-                    result(b, h, t, d) = -x2;
-                    result(b, h, t, d + feature_dim / 2) = x1;
-                }
-            }
-        }
-    }
-    return result;
+torch::Tensor RotaryPositionEmbedding2DImpl::rotate_features(const torch::Tensor& x) {
+    int64_t feature_dim = x.size(-1);
+    auto x1 = x.index({"...", torch::indexing::Slice(0, feature_dim / 2)});
+    auto x2 = x.index({"...", torch::indexing::Slice(feature_dim / 2, torch::indexing::None)});
+    return torch::cat({-x2, x1}, -1);
 }
 
-Eigen::Tensor<float, 4> RotaryPositionEmbedding2D::apply_1d_rope(
-    const Eigen::Tensor<float, 4>& tokens,
-    const Eigen::Tensor<float, 3>& positions,
-    const Eigen::Tensor<float, 2>& cos_comp,
-    const Eigen::Tensor<float, 2>& sin_comp) {
-
-    Tensor<float, 4> cos_embedding(tokens.dimension(0), 1, tokens.dimension(2), tokens.dimension(3));
-    Tensor<float, 4> sin_embedding(tokens.dimension(0), 1, tokens.dimension(2), tokens.dimension(3));
-
-    // Create embeddings from position indices
-    for (int b = 0; b < tokens.dimension(0); ++b) {
-        for (int t = 0; t < tokens.dimension(2); ++t) {
-            int pos = static_cast<int>(positions(b, t, 0));
-            for (int d = 0; d < tokens.dimension(3); ++d) {
-                cos_embedding(b, 0, t, d) = cos_comp(pos, d);
-                sin_embedding(b, 0, t, d) = sin_comp(pos, d);
-            }
-        }
-    }
+torch::Tensor RotaryPositionEmbedding2DImpl::apply_1d_rope(
+    const torch::Tensor& tokens,
+    const torch::Tensor& positions,
+    const torch::Tensor& cos_comp,
+    const torch::Tensor& sin_comp) {
+    
+    // Embed positions with frequency components
+    auto cos = torch::embedding(positions, cos_comp).unsqueeze(1);
+    auto sin = torch::embedding(positions, sin_comp).unsqueeze(1);
 
     // Apply rotation
-    return tokens * cos_embedding + rotate_features(tokens) * sin_embedding;
+    return (tokens * cos) + (rotate_features(tokens) * sin);
 }
 
-Eigen::Tensor<float, 4> RotaryPositionEmbedding2D::forward(
-    const Eigen::Tensor<float, 4>& tokens,
-    const Eigen::Tensor<float, 3>& positions) {
-
+torch::Tensor RotaryPositionEmbedding2DImpl::forward(const torch::Tensor& tokens, const torch::Tensor& positions) {
     // Validate inputs
-    if (tokens.dimension(3) % 2 != 0) {
-        throw std::invalid_argument("Feature dimension must be even");
-    }
-    if (positions.dimension(2) != 2) {
-        throw std::invalid_argument("Positions must have shape (batch_size, n_tokens, 2)");
-    }
+    TORCH_CHECK(tokens.size(-1) % 2 == 0, "Feature dimension must be even");
+    TORCH_CHECK(positions.dim() == 3 && positions.size(-1) == 2, 
+                "Positions must have shape (batch_size, n_tokens, 2)");
 
     // Compute feature dimension for each spatial direction
-    int feature_dim = tokens.dimension(3) / 2;
-
-    // Get max position for frequency computation
-    float max_pos = 0;
-    for (int i = 0; i < positions.size(); ++i) {
-        if (positions.data()[i] > max_pos) {
-            max_pos = positions.data()[i];
-        }
-    }
-    int max_position = static_cast<int>(max_pos) + 1;
+    int64_t feature_dim = tokens.size(-1) / 2;
 
     // Get frequency components
-    auto [cos_comp, sin_comp] = compute_frequency_components(feature_dim, max_position);
+    int64_t max_position = static_cast<int64_t>(positions.max().item<float>()) + 1;
+    auto [cos_comp, sin_comp] = compute_frequency_components(
+        feature_dim, max_position, tokens.device(), tokens.scalar_type());
 
     // Split features for vertical and horizontal processing
-    Tensor<float, 4> vertical_features(tokens.dimension(0), tokens.dimension(1),
-                                      tokens.dimension(2), feature_dim);
-    Tensor<float, 4> horizontal_features(tokens.dimension(0), tokens.dimension(1),
-    for (int i = 0; i < vertical_features.size(); ++i) {
-        vertical_features.data()[i] = tokens.data()[i];
-        horizontal_features.data()[i] = tokens.data()[i + feature_dim * tokens.dimension(0) * tokens.dimension(1) * tokens.dimension(2)];
-    }
+    auto chunks = tokens.chunk(2, -1);
+    auto vertical_features = chunks[0];
+    auto horizontal_features = chunks[1];
 
     // Apply RoPE separately for each dimension
-    vertical_features = apply_1d_rope(vertical_features, positions, cos_comp, sin_comp);
-    horizontal_features = apply_1d_rope(horizontal_features, positions, cos_comp, sin_comp);
+    auto y_positions = positions.index({"...", 0});
+    auto x_positions = positions.index({"...", 1});
+    
+    vertical_features = apply_1d_rope(vertical_features, y_positions, cos_comp, sin_comp);
+    horizontal_features = apply_1d_rope(horizontal_features, x_positions, cos_comp, sin_comp);
 
     // Combine processed features
-    Tensor<float, 4> result(tokens.dimension(0), tokens.dimension(1),
-                           tokens.dimension(2), tokens.dimension(3));
-    for (int i = 0; i < vertical_features.size(); ++i) {
-        result.data()[i] = vertical_features.data()[i];
-        result.data()[i + feature_dim * tokens.dimension(0) * tokens.dimension(1) * tokens.dimension(2)] =
-            horizontal_features.data()[i];
-    }
-
-    return result;
+    return torch::cat({vertical_features, horizontal_features}, -1);
 }
+
+} // namespace layers
+} // namespace vggt

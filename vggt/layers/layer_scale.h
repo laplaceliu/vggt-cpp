@@ -1,38 +1,43 @@
 /**
- * @brief Layer scaling module for vision transformers
+ * @file layer_scale.h
+ * @brief Layer scale implementation for vision transformers
  *
- * This file defines the LayerScale module which implements the layer scaling
- * technique introduced in "Going deeper with Image Transformers" (Touvron et al., 2021).
- * Layer scaling applies learnable per-channel scaling factors to the outputs of
- * transformer blocks, which helps stabilize training of deep transformer networks.
- *
- * The implementation includes:
- * 1. A LayerScaleImpl class that applies per-channel scaling to input tensors
- * 2. Support for both in-place and out-of-place operations
- * 3. Configurable initialization values for the scaling parameters
- *
- * Layer scaling is typically applied after attention and MLP blocks in transformer
- * architectures to control the contribution of each block to the overall network.
+ * This file defines the LayerScale module which applies a learnable per-channel scaling
+ * factor to the input tensor. It is commonly used in vision transformers to stabilize training.
  */
 
 #pragma once
 
 #include <torch/nn/module.h>
-#include <torch/types.h>
 
 namespace vggt {
 namespace layers {
 
 class LayerScaleImpl : public torch::nn::Module {
 public:
+    /**
+     * Layer scale module that applies a learnable per-channel scaling factor
+     *
+     * @param dim Number of input channels
+     * @param init_values Initial value for the scaling factors
+     * @param inplace Whether to perform the operation in-place
+     */
     LayerScaleImpl(
         int64_t dim,
-        torch::Tensor init_values = torch::ones({1}) * 1e-5,
+        double init_values = 1e-5,
+        bool inplace = false);
+
+    /**
+     * Forward pass of the layer scale module
+     *
+     * @param x Input tensor
+     * @return Scaled tensor
+     */
     torch::Tensor forward(const torch::Tensor& x);
 
 private:
     bool inplace_;
-    torch::Tensor gamma_;
+    torch::Tensor gamma;
 };
 
 TORCH_MODULE(LayerScale);
