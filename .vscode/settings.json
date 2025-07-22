@@ -1,11 +1,13 @@
 {
   "cSpell.words": [
+    "argparse",
     "Caffe",
     "cgal",
     "CUBLAS",
     "CUDA",
     "CUDNN",
     "DBUILD",
+    "dcgan",
     "DCMAKE",
     "DOPENCV",
     "DWITH",
@@ -15,16 +17,32 @@
     "glog",
     "googletest",
     "gtest",
+    "MNIST",
     "NVCUVENC",
     "NVCUVID",
     "openblas",
     "opencv",
+    "optim",
+    "pthread",
+    "randn",
+    "relu",
     "Tensorpipe",
-    "THIRDPARTY"
+    "THIRDPARTY",
+    "vggt"
   ],
   "files.associations": {
     "*.dbclient-js": "javascript",
     ".fantomasignore": "ignore",
-    "vector": "cpp"
+    "vector": "cpp",
+    "*.cu": "cuda-cpp",
+    "array": "cpp",
+    "bitset": "cpp",
+    "string_view": "cpp",
+    "initializer_list": "cpp",
+    "ranges": "cpp",
+    "regex": "cpp",
+    "utility": "cpp",
+    "valarray": "cpp",
+    "new": "cpp"
   }
 }

@@ -31,16 +31,23 @@ find_package(OpenCV REQUIRED)
 find_package(Torch REQUIRED)
 find_package(Eigen3 REQUIRED NO_MODULE)
 
+include_directories(
+    ${CUDAToolkit_INCLUDE_DIRS}
+    ${DEPENDENCIES}/include
+    ${DEPENDENCIES}/include/opencv4
+    ${DEPENDENCIES}/include/eigen3
+})
+
 ################################################################################
 # ${PROJECT_NAME}
 ################################################################################
 # 源文件
-add_executable(${PROJECT_NAME}
+add_executable(demo_vggt
     demo_vggt.cpp
 )
 
 # 链接库
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(demo_vggt
     PRIVATE
     pthread
     ${TORCH_LIBRARIES}
