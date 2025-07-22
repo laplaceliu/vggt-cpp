@@ -6,6 +6,7 @@
 #pragma once
 
 #include <torch/torch.h>
+#include <torch/nn/modules/container/any.h>
 #include <vector>
 #include <tuple>
 

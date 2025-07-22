@@ -1,36 +1,43 @@
-/**
- * @file pose_enc.h
- * @brief Camera pose encoding utility functions for VGGT
- */
+
 
 #pragma once
 
 #include <torch/torch.h>
-#include <tuple>
 
 namespace vggt {
 namespace utils {
 
 /**
- * @brief Convert camera extrinsics and intrinsics to compact pose encoding
+ * @brief Convert camera extrinsics and intrinsics to a compact pose encoding.
  *
- * @param extrinsics Camera extrinsics tensor of shape (B, 4, 4)
- * @param intrinsics Camera intrinsics tensor of shape (B, 3, 3)
- * @return torch::Tensor Pose encoding tensor of shape (B, 16)
+ * @param extrinsics Camera extrinsic parameters with shape BxSx3x4.
+ * @param intrinsics Camera intrinsic parameters with shape BxSx3x3.
+ * @param image_size_hw Tuple of (height, width) of the image in pixels.
+ * @param pose_encoding_type Type of pose encoding to use.
+ * @return torch::Tensor Encoded camera pose parameters with shape BxSx9.
  */
 torch::Tensor extri_intri_to_pose_encoding(
     const torch::Tensor& extrinsics,
-    const torch::Tensor& intrinsics);
+    const torch::Tensor& intrinsics,
+    const std::pair<int, int>& image_size_hw = {},
+    const std::string& pose_encoding_type = "absT_quaR_FoV"
+);
 
 /**
- * @brief Convert pose encoding back to camera extrinsics and intrinsics
+ * @brief Convert a pose encoding back to camera extrinsics and intrinsics.
  *
- * @param pose_encoding Pose encoding tensor of shape (B, 16)
- * @return std::tuple<torch::Tensor, torch::Tensor> Tuple of (extrinsics, intrinsics)
- *         where extrinsics is of shape (B, 4, 4) and intrinsics is of shape (B, 3, 3)
+ * @param pose_encoding Encoded camera pose parameters with shape BxSx9.
+ * @param image_size_hw Tuple of (height, width) of the image in pixels.
+ * @param pose_encoding_type Type of pose encoding used.
+ * @param build_intrinsics Whether to reconstruct the intrinsics matrix.
+ * @return std::tuple<torch::Tensor, torch::Tensor> (extrinsics, intrinsics)
  */
 std::tuple<torch::Tensor, torch::Tensor> pose_encoding_to_extri_intri(
-    const torch::Tensor& pose_encoding);
+    const torch::Tensor& pose_encoding,
+    const std::pair<int, int>& image_size_hw = {},
+    const std::string& pose_encoding_type = "absT_quaR_FoV",
+    bool build_intrinsics = true
+);
 
 } // namespace utils
 } // namespace vggt

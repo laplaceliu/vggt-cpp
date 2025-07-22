@@ -1,18 +1,18 @@
 
 
-#include "vggsfm_tracker.h"
+#include "track_predictor.h"
 #include <iostream>
 #include <stdexcept>
 #include <torch/script.h>
 
 namespace vggt {
 
-VGGSfMTracker::VGGSfMTracker() {
+TrackerPredictor::TrackerPredictor() {
     // Initialize with default values
     coarse_down_ratio = 2;
 }
 
-void VGGSfMTracker::load(const std::string& model_path) {
+void TrackerPredictor::load(const std::string& model_path) {
     try {
         // Load the TorchScript model
         auto model = torch::jit::load(model_path);
@@ -30,7 +30,7 @@ void VGGSfMTracker::load(const std::string& model_path) {
     }
 }
 
-torch::Tensor VGGSfMTracker::process_images_to_fmaps(const torch::Tensor& images) {
+torch::Tensor TrackerPredictor::process_images_to_fmaps(const torch::Tensor& images) {
     // Check if the model is loaded
     if (!is_training()) {
         throw std::runtime_error("Model not loaded or not in eval mode");
@@ -60,7 +60,7 @@ torch::Tensor VGGSfMTracker::process_images_to_fmaps(const torch::Tensor& images
     return fmaps;
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> VGGSfMTracker::forward(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> TrackerPredictor::forward(
     const torch::Tensor& images,
     const torch::Tensor& query_points,
     const torch::Tensor& fmaps,

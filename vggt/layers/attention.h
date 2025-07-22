@@ -1,32 +1,41 @@
 /**
  * @file attention.h
- * @brief Attention layer implementation for vision transformers
+ * @brief Attention mechanism implementation for vision transformers
  *
- * This file defines the Attention module which implements the multi-head self-attention
- * mechanism used in vision transformers. It supports both standard and fused attention
- * implementations, with optional query-key normalization.
- *
- * The module takes an input tensor and applies:
- * 1. Linear projection to queries, keys and values
- * 2. Optional layer normalization for queries and keys
- * 3. Scaled dot-product attention
- * 4. Linear projection of the output
- *
- * It supports both standard PyTorch implementation and fused attention kernels when available.
+ * This file contains the implementation of the Attention module used in vision transformers.
+ * References:
+ *   https://github.com/facebookresearch/dino/blob/master/vision_transformer.py
+ *   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py
  */
 
 #pragma once
 
-#include <torch/nn/module.h>
-#include <torch/nn/modules/dropout.h>
-#include <torch/nn/modules/linear.h>
-#include <torch/nn/modules/normalization.h>
+#include <torch/torch.h>
 
 namespace vggt {
 namespace layers {
 
+/**
+ * @brief Attention module for vision transformers
+ *
+ * This class implements the standard multi-head self-attention mechanism used in transformers.
+ */
 class AttentionImpl : public torch::nn::Module {
 public:
+    /**
+     * @brief Constructor for Attention module
+     *
+     * @param dim Input dimension
+     * @param num_heads Number of attention heads
+     * @param qkv_bias Whether to use bias in QKV projection
+     * @param proj_bias Whether to use bias in output projection
+     * @param attn_drop Dropout rate for attention weights
+     * @param proj_drop Dropout rate for output projection
+     * @param norm_layer Normalization layer type
+     * @param qk_norm Whether to apply normalization to query and key
+     * @param fused_attn Whether to use fused attention (scaled_dot_product_attention)
+     * @param rope Optional rotary position embedding
+     */
     AttentionImpl(
         int64_t dim,
         int64_t num_heads = 8,
@@ -35,24 +44,69 @@ public:
         double attn_drop = 0.0,
         double proj_drop = 0.0,
         bool qk_norm = false,
-        bool fused_attn = true);
+        bool fused_attn = true,
+        c10::optional<torch::nn::Module> rope = c10::nullopt
+    );
 
-    torch::Tensor forward(const torch::Tensor& x, const torch::Tensor& pos = {});
+    /**
+     * @brief Forward pass of the attention module
+     *
+     * @param x Input tensor of shape [B, N, C]
+     * @param pos Optional position tensor
+     * @return torch::Tensor Output tensor of shape [B, N, C]
+     */
+    torch::Tensor forward(torch::Tensor x, c10::optional<torch::Tensor> pos = c10::nullopt);
+
+    /**
+     * @brief Returns a string describing the module
+     *
+     * @return std::string Module description
+     */
+    std::string pretty_print(int64_t indent) const;
 
 private:
     int64_t num_heads_;
     int64_t head_dim_;
-    double scale_;
+    float scale_;
     bool fused_attn_;
-    torch::nn::Linear qkv{nullptr};
-    torch::nn::LayerNorm q_norm{nullptr};
-    torch::nn::LayerNorm k_norm{nullptr};
-    torch::nn::Dropout attn_drop{nullptr};
-    torch::nn::Linear proj{nullptr};
-    torch::nn::Dropout proj_drop{nullptr};
+
+    torch::nn::Linear qkv_;
+    torch::nn::Module q_norm_;
+    torch::nn::Module k_norm_;
+    torch::nn::Dropout attn_drop_;
+    torch::nn::Linear proj_;
+    torch::nn::Dropout proj_drop_;
+    c10::optional<torch::nn::Module> rope_{c10::nullopt};
 };
 
 TORCH_MODULE(Attention);
+
+/**
+ * @brief Memory efficient attention implementation
+ *
+ * This class extends the standard Attention module with memory-efficient implementation
+ * using xFormers if available.
+ */
+class MemEffAttentionImpl : public Attention {
+public:
+    using Attention::Attention;
+
+    /**
+     * @brief Forward pass of the memory-efficient attention module
+     *
+     * @param x Input tensor of shape [B, N, C]
+     * @param attn_bias Optional attention bias tensor
+     * @param pos Optional position tensor
+     * @return torch::Tensor Output tensor of shape [B, N, C]
+     */
+    torch::Tensor forward(
+        torch::Tensor x,
+        c10::optional<torch::Tensor> attn_bias = c10::nullopt,
+        c10::optional<torch::Tensor> pos = c10::nullopt
+    );
+};
+
+TORCH_MODULE(MemEffAttention);
 
 } // namespace layers
 } // namespace vggt

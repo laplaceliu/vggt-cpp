@@ -19,6 +19,7 @@ target_include_directories(vggt
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/heads
     ${CMAKE_CURRENT_SOURCE_DIR}/layers
+    ${CMAKE_CURRENT_SOURCE_DIR}/models
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/dependency
 )
@@ -36,3 +37,6 @@ target_link_libraries(vggt
 
 # 设置编译选项
 target_compile_features(vggt PUBLIC cxx_std_17)
+
+# Add subdirectories
+add_subdirectory(models)

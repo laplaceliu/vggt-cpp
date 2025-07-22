@@ -103,10 +103,10 @@ TORCH_MODULE(DPTHead);
 
 // Helper classes
 struct Scratch : torch::nn::Module {
-    torch::nn::Conv2d layer1_rn{nullptr}, layer2_rn{nullptr}, layer3_rn{nullptr}, layer4_rn{nullptr};
-    torch::nn::Module refinenet1{nullptr}, refinenet2{nullptr}, refinenet3{nullptr}, refinenet4{nullptr};
-    torch::nn::Module output_conv1{nullptr}, output_conv2{nullptr};
-    torch::nn::Module stem_transpose{nullptr};
+    torch::nn::Conv2d layer1_rn, layer2_rn, layer3_rn, layer4_rn;
+    torch::nn::Module refinenet1, refinenet2, refinenet3, refinenet4;
+    torch::nn::Module output_conv1, output_conv2;
+    torch::nn::Module stem_transpose;
 
     void reset() override;
 };
@@ -122,8 +122,8 @@ public:
     torch::Tensor forward(const torch::Tensor& x);
 
 private:
-    torch::nn::Conv2d conv1_{nullptr}, conv2_{nullptr};
-    torch::nn::Module norm1_{nullptr}, norm2_{nullptr};
+    torch::nn::Conv2d conv1_, conv2_;
+    torch::nn::Module norm1_, norm2_;
     torch::nn::AnyModule activation_;
     bool bn_;
     int64_t groups_;
@@ -157,8 +157,8 @@ private:
     std::vector<int64_t> size_;
     bool has_residual_;
 
-    torch::nn::Conv2d out_conv_{nullptr};
-    ResidualConvUnit resConfUnit1_{nullptr}, resConfUnit2_{nullptr};
+    torch::nn::Conv2d out_conv_;
+    ResidualConvUnit resConfUnit1_, resConfUnit2_;
 };
 
 TORCH_MODULE(FeatureFusionBlock);

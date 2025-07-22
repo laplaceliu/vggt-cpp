@@ -1,49 +1,54 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-// All rights reserved.
-//
-// This source code is licensed under the license found in the
-// LICENSE file in the root directory of this source tree.
+/**
+ * @file projection.h
+ * @brief Functions for projecting 3D points to 2D using camera parameters
+ * 
+ * This file contains functions for transforming 3D points to 2D using extrinsic and intrinsic parameters.
+ */
 
 #pragma once
 
-#include <Eigen/Dense>
-#include <vector>
+#include <torch/torch.h>
+#include <c10/util/Optional.h>
 
 namespace vggt {
+namespace dependency {
 
 /**
- * @brief Apply camera intrinsics (and optional radial distortion) to camera-space points.
- *
- * @param intrinsics Bx3x3 camera matrix K
- * @param points_cam Bx3xN homogeneous camera coordinates (x, y, z)ᵀ
- * @param extra_params BxN or Bxk distortion parameters (k = 1,2,4) or empty vector if no distortion
- * @param default value used for NaN replacement
- * @return std::vector<Eigen::MatrixXd> BxNx2 pixel coordinates
+ * @brief Apply intrinsics (and optional radial distortion) to camera-space points.
+ * 
+ * @param intrinsics (B,3,3) camera matrix K
+ * @param points_cam (B,3,N) homogeneous camera coords (x, y, z)ᵀ
+ * @param extra_params (B,N) or (B,k) distortion params (k = 1,2,4) or None
+ * @param default_val Value used for NaN replacement
+ * @return torch::Tensor (B,N,2) pixel coordinates
  */
-std::vector<Eigen::MatrixXd> imgFromCam(
-    const std::vector<Eigen::Matrix3d>& intrinsics,
-    const std::vector<Eigen::MatrixXd>& points_cam,
-    const std::vector<Eigen::VectorXd>& extra_params = {},
-    double default_val = 0.0);
+torch::Tensor img_from_cam(
+    const torch::Tensor& intrinsics,
+    const torch::Tensor& points_cam,
+    const c10::optional<torch::Tensor>& extra_params = c10::nullopt,
+    float default_val = 0.0
+);
 
 /**
- * @brief Project 3D world points to 2D image coordinates.
- *
- * @param points3D Nx3 world-space points
- * @param extrinsics Bx3x4 [R|t] matrix for each of B cameras
- * @param intrinsics Bx3x3 K matrix (optional if only_points_cam=true)
- * @param extra_params Bxk or BxN distortion parameters (k ∈ {1,2,4}) or empty vector
- * @param default_val value used to replace NaNs
- * @param only_points_cam if true, skip the projection and return points2D as empty
- * @return std::pair<std::vector<Eigen::MatrixXd>, std::vector<Eigen::MatrixXd>>
- *         (points2D, points_cam) where points2D is BxNx2 or empty, points_cam is Bx3xN
+ * @brief Transforms 3D points to 2D using extrinsic and intrinsic parameters.
+ * 
+ * @param points3D (P,3) 3D points
+ * @param extrinsics (B,3,4) Extrinsic parameters [R|t]
+ * @param intrinsics (B,3,3) Intrinsic parameters K
+ * @param extra_params (B,N) or (B,k) Extra parameters for radial distortion
+ * @param default_val Default value to replace NaNs
+ * @param only_points_cam If true, skip the projection and return points2D as None
+ * @return std::tuple<torch::Tensor, torch::Tensor> (points2D, points_cam) where points2D is (B,N,2) or None,
+ *         and points_cam is (B,3,N)
  */
-std::pair<std::vector<Eigen::MatrixXd>, std::vector<Eigen::MatrixXd>> project3DPoints(
-    const Eigen::MatrixXd& points3D,
-    const std::vector<Eigen::Matrix<double, 3, 4>>& extrinsics,
-    const std::vector<Eigen::Matrix3d>& intrinsics = {},
-    const std::vector<Eigen::VectorXd>& extra_params = {},
-    double default_val = 0.0,
-    bool only_points_cam = false);
+std::tuple<c10::optional<torch::Tensor>, torch::Tensor> project_3D_points(
+    const torch::Tensor& points3D,
+    const torch::Tensor& extrinsics,
+    const c10::optional<torch::Tensor>& intrinsics = c10::nullopt,
+    const c10::optional<torch::Tensor>& extra_params = c10::nullopt,
+    float default_val = 0.0,
+    bool only_points_cam = false
+);
 
+} // namespace dependency
 } // namespace vggt

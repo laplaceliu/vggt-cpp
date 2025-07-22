@@ -38,10 +38,10 @@ public:
     torch::Tensor forward(torch::Tensor x);
 
 private:
-    torch::nn::Conv2d conv1{nullptr}, conv2{nullptr};
-    torch::nn::ReLU relu{nullptr};
-    torch::nn::GroupNorm norm1{nullptr}, norm2{nullptr}, norm3{nullptr};
-    torch::nn::Sequential downsample{nullptr};
+    torch::nn::Conv2d conv1, conv2;
+    torch::nn::ReLU relu;
+    torch::nn::GroupNorm norm1, norm2, norm3;
+    torch::nn::Sequential downsample;
     std::string norm_type;
 };
 
@@ -80,9 +80,9 @@ public:
     torch::Tensor forward(torch::Tensor x);
 
 private:
-    torch::nn::AnyModule fc1{nullptr}, fc2{nullptr};
-    torch::nn::AnyModule act{nullptr};
-    torch::nn::Dropout drop1{nullptr}, drop2{nullptr};
+    torch::nn::AnyModule fc1, fc2;
+    torch::nn::AnyModule act;
+    torch::nn::Dropout drop1, drop2;
 };
 
 /**
@@ -111,9 +111,9 @@ public:
     torch::Tensor forward(torch::Tensor x, torch::Tensor mask = {});
 
 private:
-    torch::nn::LayerNorm norm1{nullptr}, norm2{nullptr};
-    torch::nn::MultiheadAttention attn{nullptr};
-    Mlp mlp{nullptr};
+    torch::nn::LayerNorm norm1, norm2;
+    torch::nn::MultiheadAttention attn;
+    Mlp mlp;
 };
 
 /**
@@ -145,9 +145,9 @@ public:
     torch::Tensor forward(torch::Tensor x, torch::Tensor context, torch::Tensor mask = {});
 
 private:
-    torch::nn::LayerNorm norm1{nullptr}, norm_context{nullptr}, norm2{nullptr};
-    torch::nn::MultiheadAttention cross_attn{nullptr};
-    Mlp mlp{nullptr};
+    torch::nn::LayerNorm norm1, norm_context, norm2;
+    torch::nn::MultiheadAttention cross_attn;
+    Mlp mlp;
 };
 
 } // namespace vggt

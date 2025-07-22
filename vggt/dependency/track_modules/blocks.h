@@ -20,10 +20,10 @@ public:
     torch::Tensor forward(torch::Tensor x);
 
 private:
-    torch::nn::Conv2d conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
-    torch::nn::InstanceNorm2d norm1{nullptr}, norm2{nullptr};
-    torch::nn::ReLU relu1{nullptr}, relu2{nullptr};
-    torch::nn::Sequential layer1{nullptr}, layer2{nullptr}, layer3{nullptr}, layer4{nullptr};
+    torch::nn::Conv2d conv1, conv2, conv3;
+    torch::nn::InstanceNorm2d norm1, norm2;
+    torch::nn::ReLU relu1, relu2;
+    torch::nn::Sequential layer1, layer2, layer3, layer4;
     int stride;
     int in_planes;
 
@@ -41,10 +41,10 @@ public:
     torch::Tensor forward(torch::Tensor x);
 
 private:
-    torch::nn::Conv2d conv1{nullptr}, conv2{nullptr};
-    torch::nn::ReLU relu1{nullptr};
-    torch::nn::Module norm1{nullptr}, norm2{nullptr};
-    torch::nn::Sequential layer1{nullptr}, layer2{nullptr};
+    torch::nn::Conv2d conv1, conv2;
+    torch::nn::ReLU relu1;
+    torch::nn::Module norm1, norm2;
+    torch::nn::Sequential layer1, layer2;
     int stride;
     int in_planes;
     std::string norm_fn;
@@ -81,14 +81,14 @@ private:
     bool add_space_attn;
     int num_virtual_tracks;
 
-    torch::nn::Linear input_transform{nullptr};
-    torch::nn::Linear flow_head{nullptr};
+    torch::nn::Linear input_transform;
+    torch::nn::Linear flow_head;
     torch::Tensor virual_tracks;
 
-    torch::nn::ModuleList time_blocks{nullptr};
-    torch::nn::ModuleList space_virtual_blocks{nullptr};
-    torch::nn::ModuleList space_point2virtual_blocks{nullptr};
-    torch::nn::ModuleList space_virtual2point_blocks{nullptr};
+    torch::nn::ModuleList time_blocks;
+    torch::nn::ModuleList space_virtual_blocks;
+    torch::nn::ModuleList space_point2virtual_blocks;
+    torch::nn::ModuleList space_virtual2point_blocks;
 };
 TORCH_MODULE(EfficientUpdateFormer);
 

@@ -1,139 +1,90 @@
-// Copyright (c) Meta Platforms, Inc. and affiliates.
-// All rights reserved.
-//
-// This source code is licensed under the license found in the
-// LICENSE file in the root directory of this source tree.
+/**
+ * @file projection.cpp
+ * @brief Implementation of functions for projecting 3D points to 2D using camera parameters
+ */
 
 #include "projection.h"
-#include <Eigen/Dense>
-#include <vector>
-#include <stdexcept>
+#include "distortion.h"
 
 namespace vggt {
+namespace dependency {
 
-namespace { // helper functions
+torch::Tensor img_from_cam(
+    const torch::Tensor& intrinsics,
+    const torch::Tensor& points_cam,
+    const c10::optional<torch::Tensor>& extra_params,
+    float default_val
+) {
+    // 1. perspective divide
+    auto z = points_cam.index({"...", torch::indexing::Slice(2, 3), torch::indexing::Slice()});  // (B,1,N)
+    auto points_cam_norm = points_cam / z;  // (B,3,N)
+    auto uv = points_cam_norm.index({"...", torch::indexing::Slice(0, 2), torch::indexing::Slice()});  // (B,2,N)
 
-Eigen::MatrixXd applyDistortion(
-    const Eigen::VectorXd& params,
-    const Eigen::VectorXd& u,
-    const Eigen::VectorXd& v) {
-    // Convert vectors to matrices for batch processing
-    Eigen::MatrixXd params_mat(1, params.size());
-    params_mat.row(0) = params;
+    // 2. optional distortion
+    if (extra_params.has_value()) {
+        auto u = uv.index({"...", 0, torch::indexing::Slice()});
+        auto v = uv.index({"...", 1, torch::indexing::Slice()});
+        auto distortion_result = apply_distortion(extra_params.value(), u, v);
+        auto uu = std::get<0>(distortion_result);
+        auto vv = std::get<1>(distortion_result);
+        uv = torch::stack({uu, vv}, 1);  // (B,2,N)
+    }
 
-    Eigen::MatrixXd u_mat(1, u.size());
-    u_mat.row(0) = u;
+    // 3. homogeneous coords then K multiplication
+    auto ones = torch::ones_like(uv.index({"...", torch::indexing::Slice(0, 1), torch::indexing::Slice()}));  // (B,1,N)
+    auto points_cam_h = torch::cat({uv, ones}, 1);  // (B,3,N)
 
-    Eigen::MatrixXd v_mat(1, v.size());
-    v_mat.row(0) = v;
+    // batched mat-mul: K · [u v 1]ᵀ
+    auto points2D_h = torch::bmm(intrinsics, points_cam_h);  // (B,3,N)
+    auto points2D = points2D_h.index({"...", torch::indexing::Slice(0, 2), torch::indexing::Slice()});  // (B,2,N)
+    
+    // Replace NaNs with default value
+    points2D = torch::nan_to_num(points2D, default_val);
 
-    // Call the distortion function
-    auto [u_dist, v_dist] = vggt::applyDistortion(params_mat, u_mat, v_mat);
-
-    // Combine results into single matrix
-    Eigen::MatrixXd result(2, u.size());
-    result << u_dist.row(0), v_dist.row(0);
-    return result;
+    return points2D.transpose(1, 2);  // (B,N,2)
 }
 
-} // namespace
-
-std::vector<Eigen::MatrixXd> imgFromCam(
-    const std::vector<Eigen::Matrix3d>& intrinsics,
-    const std::vector<Eigen::MatrixXd>& points_cam,
-    const std::vector<Eigen::VectorXd>& extra_params,
-    double default_val) {
-
-    if (intrinsics.size() != points_cam.size()) {
-        throw std::invalid_argument("intrinsics and points_cam must have same batch size");
-    }
-
-    if (!extra_params.empty() && extra_params.size() != intrinsics.size()) {
-        throw std::invalid_argument("extra_params must be empty or match batch size");
-    }
-
-    const size_t B = intrinsics.size();
-    std::vector<Eigen::MatrixXd> points2D(B);
-
-    for (size_t b = 0; b < B; ++b) {
-        const auto& K = intrinsics[b];
-        const auto& pc = points_cam[b];
-        const size_t N = pc.cols();
-
-        // 1. Perspective divide
-        Eigen::MatrixXd points_cam_norm = pc.array().rowwise() / pc.row(2).array();
-        Eigen::MatrixXd uv = points_cam_norm.topRows(2);
-
-        // 2. Apply distortion if needed
-        if (!extra_params.empty()) {
-            const auto& params = extra_params[b];
-            Eigen::MatrixXd distorted_uv = applyDistortion(params, uv.row(0), uv.row(1));
-            uv = distorted_uv;
-        }
-
-        // 3. Homogeneous coords then K multiplication
-        Eigen::MatrixXd points_cam_h(3, N);
-        points_cam_h << uv, Eigen::RowVectorXd::Ones(N);
-
-        Eigen::MatrixXd points2D_h = K * points_cam_h;
-        Eigen::MatrixXd result = points2D_h.topRows(2);
-
-        // Replace NaNs with default value
-        for (int i = 0; i < result.rows(); ++i) {
-            for (int j = 0; j < result.cols(); ++j) {
-                if (std::isnan(result(i,j))) {
-                    result(i,j) = default_val;
-                }
-            }
-        }
-
-        points2D[b] = result.transpose(); // Convert to BxNx2 format
-    }
-
-    return points2D;
-}
-
-std::pair<std::vector<Eigen::MatrixXd>, std::vector<Eigen::MatrixXd>> project3DPoints(
-    const Eigen::MatrixXd& points3D,
-    const std::vector<Eigen::Matrix<double, 3, 4>>& extrinsics,
-    const std::vector<Eigen::Matrix3d>& intrinsics,
-    const std::vector<Eigen::VectorXd>& extra_params,
-    double default_val,
-    bool only_points_cam) {
-
-    const size_t B = extrinsics.size();
-    const size_t N = points3D.rows();
-
-    if (!intrinsics.empty() && intrinsics.size() != B) {
-        throw std::invalid_argument("intrinsics must be empty or match extrinsics batch size");
-    }
-
-    if (!extra_params.empty() && extra_params.size() != B) {
-        throw std::invalid_argument("extra_params must be empty or match batch size");
-    }
-
-    // 1. Convert to homogeneous coordinates
-    Eigen::MatrixXd points3D_h(N, 4);
-    points3D_h << points3D, Eigen::VectorXd::Ones(N);
-
-    // 2. Apply extrinsics (world to camera)
-    std::vector<Eigen::MatrixXd> points_cam(B);
-    for (size_t b = 0; b < B; ++b) {
-        points_cam[b] = extrinsics[b] * points3D_h.transpose(); // 3xN
-    }
-
+std::tuple<c10::optional<torch::Tensor>, torch::Tensor> project_3D_points(
+    const torch::Tensor& points3D,
+    const torch::Tensor& extrinsics,
+    const c10::optional<torch::Tensor>& intrinsics,
+    const c10::optional<torch::Tensor>& extra_params,
+    float default_val,
+    bool only_points_cam
+) {
+    // Use double precision for calculations
+    torch::NoGradGuard no_grad;
+    
+    // Get dimensions
+    int64_t N = points3D.size(0);  // Number of points
+    int64_t B = extrinsics.size(0);  // Batch size, i.e., number of cameras
+    
+    // Create homogeneous coordinates
+    auto points3D_homogeneous = torch::cat({
+        points3D, 
+        torch::ones({N, 1}, points3D.options())
+    }, 1);  // (N,4)
+    
+    // Reshape for batch processing
+    auto points3D_homogeneous_B = points3D_homogeneous.unsqueeze(0).expand({B, -1, -1});  // (B,N,4)
+    
+    // Step 1: Apply extrinsic parameters
+    // Transform 3D points to camera coordinate system for all cameras
+    auto points_cam = torch::bmm(extrinsics, points3D_homogeneous_B.transpose(1, 2));  // (B,3,N)
+    
     if (only_points_cam) {
-        return {{}, points_cam};
+        return std::make_tuple(c10::nullopt, points_cam);
     }
-
-    if (intrinsics.empty()) {
-        throw std::invalid_argument("intrinsics must be provided unless only_points_cam=true");
+    
+    // Step 2: Apply intrinsic parameters and (optional) distortion
+    if (!intrinsics.has_value()) {
+        throw std::invalid_argument("`intrinsics` must be provided unless only_points_cam=True");
     }
-
-    // 3. Apply intrinsics and distortion
-    auto points2D = imgFromCam(intrinsics, points_cam, extra_params, default_val);
-
-    return {points2D, points_cam};
+    
+    auto points2D = img_from_cam(intrinsics.value(), points_cam, extra_params, default_val);
+    
+    return std::make_tuple(points2D, points_cam);
 }
 
+} // namespace dependency
 } // namespace vggt
