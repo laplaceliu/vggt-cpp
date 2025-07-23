@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -9,7 +13,7 @@ namespace utils {
 
 /**
  * @brief Convert camera extrinsics and intrinsics to a compact pose encoding.
- *
+ * 
  * @param extrinsics Camera extrinsic parameters with shape BxSx3x4.
  * @param intrinsics Camera intrinsic parameters with shape BxSx3x3.
  * @param image_size_hw Tuple of (height, width) of the image in pixels.
@@ -25,7 +29,7 @@ torch::Tensor extri_intri_to_pose_encoding(
 
 /**
  * @brief Convert a pose encoding back to camera extrinsics and intrinsics.
- *
+ * 
  * @param pose_encoding Encoded camera pose parameters with shape BxSx9.
  * @param image_size_hw Tuple of (height, width) of the image in pixels.
  * @param pose_encoding_type Type of pose encoding used.

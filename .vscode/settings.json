@@ -47,6 +47,7 @@
     "new": "cpp",
     "rope": "cpp",
     "variant": "cpp",
-    "chrono": "cpp"
+    "chrono": "cpp",
+    "tuple": "cpp"
   }
 }

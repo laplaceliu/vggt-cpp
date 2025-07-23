@@ -1,7 +1,8 @@
-/**
- * @file rotation.cpp
- * @brief Implementation of rotation utility functions for VGGT
- */
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #include "rotation.h"
 #include <torch/torch.h>
@@ -9,152 +10,99 @@
 namespace vggt {
 namespace utils {
 
+torch::Tensor quat_to_mat(const torch::Tensor& quaternions) {
+    auto i = quaternions.index({torch::indexing::Slice(), 0});
+    auto j = quaternions.index({torch::indexing::Slice(), 1});
+    auto k = quaternions.index({torch::indexing::Slice(), 2});
+    auto r = quaternions.index({torch::indexing::Slice(), 3});
+
+    auto two_s = 2.0 / (quaternions * quaternions).sum(-1);
+
+    auto o = torch::stack(
+        {
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * k + j * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (j * k - i * r),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+            1 - two_s * (i * i + j * j)
+        },
+        -1
+    );
+    return o.reshape(quaternions.sizes().vec() + std::vector<int64_t>{3, 3});
+}
+
+torch::Tensor mat_to_quat(const torch::Tensor& matrix) {
+    if (matrix.size(-1) != 3 || matrix.size(-2) != 3) {
+        throw std::runtime_error("Invalid rotation matrix shape.");
+    }
+
+    auto batch_dim = matrix.sizes().vec();
+    batch_dim.pop_back();
+    batch_dim.pop_back();
+
+    auto m = matrix.reshape(batch_dim + std::vector<int64_t>{9});
+    auto m00 = m.index({torch::indexing::Slice(), 0});
+    auto m01 = m.index({torch::indexing::Slice(), 1});
+    auto m02 = m.index({torch::indexing::Slice(), 2});
+    auto m10 = m.index({torch::indexing::Slice(), 3});
+    auto m11 = m.index({torch::indexing::Slice(), 4});
+    auto m12 = m.index({torch::indexing::Slice(), 5});
+    auto m20 = m.index({torch::indexing::Slice(), 6});
+    auto m21 = m.index({torch::indexing::Slice(), 7});
+    auto m22 = m.index({torch::indexing::Slice(), 8});
+
+    auto q_abs = _sqrt_positive_part(
+        torch::stack(
+            {
+                1.0 + m00 + m11 + m22,
+                1.0 + m00 - m11 - m22,
+                1.0 - m00 + m11 - m22,
+                1.0 - m00 - m11 + m22
+            },
+            -1
+        )
+    );
+
+    auto quat_by_rijk = torch::stack(
+        {
+            torch::stack({q_abs.index({torch::indexing::Slice(), 0}).pow(2), m21 - m12, m02 - m20, m10 - m01}, -1),
+            torch::stack({m21 - m12, q_abs.index({torch::indexing::Slice(), 1}).pow(2), m10 + m01, m02 + m20}, -1),
+            torch::stack({m02 - m20, m10 + m01, q_abs.index({torch::indexing::Slice(), 2}).pow(2), m12 + m21}, -1),
+            torch::stack({m10 - m01, m20 + m02, m21 + m12, q_abs.index({torch::indexing::Slice(), 3}).pow(2)}, -1)
+        },
+        -2
+    );
+
+    auto flr = torch::tensor(0.1, torch::TensorOptions().dtype(q_abs.dtype()).device(q_abs.device()));
+    auto quat_candidates = quat_by_rijk / (2.0 * q_abs.index({torch::indexing::Slice(), torch::indexing::None}).max(flr));
+
+    auto out = quat_candidates.index(
+        {torch::indexing::Slice(), torch::one_hot(q_abs.argmax(-1), 4).to(torch::kBool)}
+    ).reshape(batch_dim + std::vector<int64_t>{4});
+
+    // Convert from rijk to ijkr
+    out = out.index({torch::indexing::Slice(), std::vector<int64_t>{1, 2, 3, 0}});
+
+    return standardize_quaternion(out);
+}
+
 torch::Tensor _sqrt_positive_part(const torch::Tensor& x) {
-    // Return sqrt(max(0, x))
-    return torch::sqrt(torch::max(x, torch::zeros_like(x)));
+    auto ret = torch::zeros_like(x);
+    auto positive_mask = x > 0;
+    if (torch::is_grad_enabled()) {
+        ret.index_put_({positive_mask}, x.index({positive_mask}).sqrt());
+    } else {
+        ret = torch::where(positive_mask, x.sqrt(), ret);
+    }
+    return ret;
 }
 
-torch::Tensor quat_to_mat(const torch::Tensor& quaternion) {
-    // Normalize quaternion
-    auto q = quaternion / torch::norm(quaternion, 2, -1, true);
-
-    // Extract quaternion components
-    auto w = q.index({Ellipsis, 0});
-    auto x = q.index({Ellipsis, 1});
-    auto y = q.index({Ellipsis, 2});
-    auto z = q.index({Ellipsis, 3});
-
-    // Compute rotation matrix elements
-    auto batch_size = quaternion.size(0);
-    auto device = quaternion.device();
-    auto dtype = quaternion.dtype();
-
-    auto zeros = torch::zeros({batch_size}, torch::TensorOptions().device(device).dtype(dtype));
-    auto ones = torch::ones({batch_size}, torch::TensorOptions().device(device).dtype(dtype));
-
-    // First row
-    auto r00 = 1 - 2 * (y * y + z * z);
-    auto r01 = 2 * (x * y - w * z);
-    auto r02 = 2 * (x * z + w * y);
-
-    // Second row
-    auto r10 = 2 * (x * y + w * z);
-    auto r11 = 1 - 2 * (x * x + z * z);
-    auto r12 = 2 * (y * z - w * x);
-
-    // Third row
-    auto r20 = 2 * (x * z - w * y);
-    auto r21 = 2 * (y * z + w * x);
-    auto r22 = 1 - 2 * (x * x + y * y);
-
-    // Stack to form rotation matrix
-    auto row0 = torch::stack({r00, r01, r02}, -1);
-    auto row1 = torch::stack({r10, r11, r12}, -1);
-    auto row2 = torch::stack({r20, r21, r22}, -1);
-
-    auto rotation_matrix = torch::stack({row0, row1, row2}, -2);
-
-    return rotation_matrix;
-}
-
-torch::Tensor mat_to_quat(const torch::Tensor& rotation_matrix) {
-    // Extract rotation matrix elements
-    auto m00 = rotation_matrix.index({Ellipsis, 0, 0});
-    auto m01 = rotation_matrix.index({Ellipsis, 0, 1});
-    auto m02 = rotation_matrix.index({Ellipsis, 0, 2});
-    auto m10 = rotation_matrix.index({Ellipsis, 1, 0});
-    auto m11 = rotation_matrix.index({Ellipsis, 1, 1});
-    auto m12 = rotation_matrix.index({Ellipsis, 1, 2});
-    auto m20 = rotation_matrix.index({Ellipsis, 2, 0});
-    auto m21 = rotation_matrix.index({Ellipsis, 2, 1});
-    auto m22 = rotation_matrix.index({Ellipsis, 2, 2});
-
-    // Compute quaternion components
-    auto q0 = _sqrt_positive_part(1 + m00 + m11 + m22);
-    auto q1 = _sqrt_positive_part(1 + m00 - m11 - m22);
-    auto q2 = _sqrt_positive_part(1 - m00 + m11 - m22);
-    auto q3 = _sqrt_positive_part(1 - m00 - m11 + m22);
-
-    auto q0q1 = q0 * q1;
-    auto q0q2 = q0 * q2;
-    auto q0q3 = q0 * q3;
-    auto q1q2 = q1 * q2;
-    auto q1q3 = q1 * q3;
-    auto q2q3 = q2 * q3;
-
-    auto device = rotation_matrix.device();
-    auto dtype = rotation_matrix.dtype();
-    auto eps = torch::tensor(1e-6, torch::TensorOptions().device(device).dtype(dtype));
-
-    // Case 1: q0 largest
-    auto mask_q0_largest = q0 >= torch::max(torch::max(q1, q2), q3);
-    auto q0_largest_w = q0;
-    auto q0_largest_x = (m21 - m12) / (4 * q0);
-    auto q0_largest_y = (m02 - m20) / (4 * q0);
-    auto q0_largest_z = (m10 - m01) / (4 * q0);
-
-    // Case 2: q1 largest
-    auto mask_q1_largest = (q1 >= q0) & (q1 >= q2) & (q1 >= q3);
-    auto q1_largest_w = (m21 - m12) / (4 * q1);
-    auto q1_largest_x = q1;
-    auto q1_largest_y = (m01 + m10) / (4 * q1);
-    auto q1_largest_z = (m02 + m20) / (4 * q1);
-
-    // Case 3: q2 largest
-    auto mask_q2_largest = (q2 >= q0) & (q2 >= q1) & (q2 >= q3);
-    auto q2_largest_w = (m02 - m20) / (4 * q2);
-    auto q2_largest_x = (m01 + m10) / (4 * q2);
-    auto q2_largest_y = q2;
-    auto q2_largest_z = (m12 + m21) / (4 * q2);
-
-    // Case 4: q3 largest
-    auto mask_q3_largest = (q3 >= q0) & (q3 >= q1) & (q3 >= q2);
-    auto q3_largest_w = (m10 - m01) / (4 * q3);
-    auto q3_largest_x = (m02 + m20) / (4 * q3);
-    auto q3_largest_y = (m12 + m21) / (4 * q3);
-    auto q3_largest_z = q3;
-
-    // Combine cases
-    auto w = torch::zeros_like(q0);
-    auto x = torch::zeros_like(q0);
-    auto y = torch::zeros_like(q0);
-    auto z = torch::zeros_like(q0);
-
-    w = torch::where(mask_q0_largest, q0_largest_w, w);
-    x = torch::where(mask_q0_largest, q0_largest_x, x);
-    y = torch::where(mask_q0_largest, q0_largest_y, y);
-    z = torch::where(mask_q0_largest, q0_largest_z, z);
-
-    w = torch::where(mask_q1_largest, q1_largest_w, w);
-    x = torch::where(mask_q1_largest, q1_largest_x, x);
-    y = torch::where(mask_q1_largest, q1_largest_y, y);
-    z = torch::where(mask_q1_largest, q1_largest_z, z);
-
-    w = torch::where(mask_q2_largest, q2_largest_w, w);
-    x = torch::where(mask_q2_largest, q2_largest_x, x);
-    y = torch::where(mask_q2_largest, q2_largest_y, y);
-    z = torch::where(mask_q2_largest, q2_largest_z, z);
-
-    w = torch::where(mask_q3_largest, q3_largest_w, w);
-    x = torch::where(mask_q3_largest, q3_largest_x, x);
-    y = torch::where(mask_q3_largest, q3_largest_y, y);
-    z = torch::where(mask_q3_largest, q3_largest_z, z);
-
-    // Stack to form quaternion
-    auto quaternion = torch::stack({w, x, y, z}, -1);
-
-    // Normalize quaternion
-    quaternion = quaternion / torch::norm(quaternion, 2, -1, true);
-
-    return standardize_quaternion(quaternion);
-}
-
-torch::Tensor standardize_quaternion(const torch::Tensor& quaternion) {
-    // Ensure real part is non-negative
-    auto q = quaternion.clone();
-    auto mask = q.index({Ellipsis, 0}) < 0;
-    q = torch::where(mask.unsqueeze(-1), -q, q);
-    return q;
+torch::Tensor standardize_quaternion(const torch::Tensor& quaternions) {
+    return torch::where(quaternions.index({torch::indexing::Slice(), 3}) < 0, -quaternions, quaternions);
 }
 
 } // namespace utils
