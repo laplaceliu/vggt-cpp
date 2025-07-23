@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -10,7 +14,7 @@ namespace vggt {
 
 /**
  * @brief C++ implementation of the VGGSfM tracker from Python
- *
+ * 
  * This class is responsible for predicting tracks in a sequence of images.
  */
 class VGGSfMTracker : public torch::nn::Module {
@@ -22,14 +26,14 @@ public:
 
     /**
      * @brief Load model weights from a file
-     *
+     * 
      * @param model_path Path to the model weights file
      */
     void load(const std::string& model_path);
 
     /**
      * @brief Forward pass of the tracker
-     *
+     * 
      * @param images Images tensor with shape [B, S, 3, H, W]
      * @param query_points Query points tensor with shape [B, N, 2]
      * @param fmaps Precomputed feature maps (optional)
@@ -37,7 +41,7 @@ public:
      * @param fine_chunk Chunk size for fine tracking
      * @param coarse_iters Number of iterations for coarse prediction
      * @param inference Whether to perform inference
-     * @return std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+     * @return std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> 
      *         (fine_pred_track, coarse_pred_track, pred_vis, pred_score)
      */
     std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward(
@@ -52,7 +56,7 @@ public:
 
     /**
      * @brief Process images to feature maps
-     *
+     * 
      * @param images Images tensor with shape [S, 3, H, W]
      * @return torch::Tensor Feature maps
      */
@@ -60,13 +64,13 @@ public:
 
 private:
     // Coarse predictor components
-    torch::nn::Module coarse_fnet;
-    torch::nn::Module coarse_predictor;
+    torch::nn::Module coarse_fnet{nullptr};
+    torch::nn::Module coarse_predictor{nullptr};
     int coarse_down_ratio = 2;
 
     // Fine predictor components
-    torch::nn::Module fine_fnet;
-    torch::nn::Module fine_predictor;
+    torch::nn::Module fine_fnet{nullptr};
+    torch::nn::Module fine_predictor{nullptr};
 };
 
 } // namespace vggt

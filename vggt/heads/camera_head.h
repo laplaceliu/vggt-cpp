@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -38,7 +42,7 @@ private:
     torch::nn::Linear embed_pose;
     torch::nn::Sequential poseLN_modulation;
     torch::nn::LayerNorm adaln_norm;
-    layers::Mlp pose_branch;
+    Mlp pose_branch;
 };
 TORCH_MODULE(CameraHead);
 

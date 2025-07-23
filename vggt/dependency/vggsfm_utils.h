@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -22,7 +26,7 @@ class FeatureExtractor;
 
 /**
  * Build and initialize the VGGSfM tracker.
- *
+ * 
  * @param model_path Path to the model weights file. If empty, weights are downloaded from HuggingFace.
  * @return Initialized tracker model in eval mode.
  */
@@ -30,7 +34,7 @@ std::shared_ptr<TrackerPredictor> buildVggsfmTracker(const std::string& model_pa
 
 /**
  * Generate a ranking of frames using DINO ViT features.
- *
+ * 
  * @param images Tensor of shape (S, 3, H, W) with values in range [0, 1]
  * @param query_frame_num Number of frames to select
  * @param image_size Size to resize images to before processing
@@ -50,7 +54,7 @@ std::vector<int64_t> generateRankByDino(
 
 /**
  * Farthest point sampling algorithm to select diverse frames.
- *
+ * 
  * @param distance_matrix Matrix of distances between frames
  * @param num_samples Number of frames to select
  * @param most_common_frame_index Index of the first frame to select
@@ -65,7 +69,7 @@ std::vector<int64_t> farthestPointSampling(
 /**
  * Construct an order that switches [query_index] and [0]
  * so that the content of query_index would be placed at [0].
- *
+ * 
  * @param query_index Index to swap with 0
  * @param S Total number of elements
  * @param device Device to place the tensor on
@@ -79,7 +83,7 @@ torch::Tensor calculateIndexMappings(
 
 /**
  * Reorder tensors along a specific dimension according to the given order.
- *
+ * 
  * @param tensors List of tensors to reorder
  * @param order Tensor of indices specifying the new order
  * @param dim Dimension along which to reorder
@@ -140,7 +144,7 @@ private:
 
 /**
  * Initialize feature extractors that can be reused based on a method string.
- *
+ * 
  * @param max_query_num Maximum number of keypoints to extract
  * @param det_thres Detection threshold for keypoint extraction
  * @param extractor_method String specifying which extractors to use (e.g., "aliked", "sp+sift", "aliked+sp+sift")
@@ -156,7 +160,7 @@ std::unordered_map<std::string, std::shared_ptr<FeatureExtractor>> initializeFea
 
 /**
  * Extract keypoints using pre-initialized feature extractors.
- *
+ * 
  * @param query_image Input image tensor (3xHxW, range [0, 1])
  * @param extractors Dictionary of initialized extractors
  * @param round_keypoints Whether to round keypoint coordinates to integers
@@ -170,7 +174,7 @@ torch::Tensor extractKeypoints(
 
 /**
  * Process a list of query points to avoid memory issues.
- *
+ * 
  * @param track_predictor The track predictor object used for predicting tracks
  * @param images_feed A tensor of shape (B, T, C, H, W) representing a batch of images
  * @param query_points_list A list of tensors, each of shape (B, Ni, 2) representing chunks of query points

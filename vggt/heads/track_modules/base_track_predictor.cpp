@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #include "base_track_predictor.h"
 #include <iostream>
@@ -24,7 +28,7 @@ BaseTrackerPredictor::BaseTrackerPredictor(
     use_spaceatt(use_spaceatt),
     depth(depth),
     fine(fine) {
-
+    
     // Initialize derived parameters
     flows_emb_dim = latent_dim / 2;
     transformer_dim = corr_levels * (corr_radius * 2 + 1) * (corr_radius * 2 + 1) + latent_dim * 2;
@@ -37,15 +41,15 @@ BaseTrackerPredictor::BaseTrackerPredictor(
     }
 
     // Initialize transformer
-    register_module("updateformer",
+    register_module("updateformer", 
         EfficientUpdateFormer(
-            depth,
-            depth,
-            transformer_dim,
-            hidden_size,
-            latent_dim + 2,
-            4.0,
-            use_spaceatt
+            space_depth=depth,
+            time_depth=depth,
+            input_dim=transformer_dim,
+            hidden_size=hidden_size,
+            output_dim=latent_dim + 2,
+            mlp_ratio=4.0,
+            add_space_attn=use_spaceatt
         )
     );
 
@@ -53,7 +57,7 @@ BaseTrackerPredictor::BaseTrackerPredictor(
     register_module("norm", torch::nn::GroupNorm(1, latent_dim));
 
     // Initialize feature updater
-    register_module("ffeat_updater",
+    register_module("ffeat_updater", 
         torch::nn::Sequential(
             torch::nn::Linear(latent_dim, latent_dim),
             torch::nn::GELU()
@@ -62,7 +66,7 @@ BaseTrackerPredictor::BaseTrackerPredictor(
 
     if (!fine) {
         // Initialize visibility predictor
-        register_module("vis_predictor",
+        register_module("vis_predictor", 
             torch::nn::Sequential(
                 torch::nn::Linear(latent_dim, 1)
             )

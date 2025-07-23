@@ -1,4 +1,8 @@
-
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -10,14 +14,14 @@ namespace track_modules {
 
 /**
  * @brief Base class for track predictors
- *
+ * 
  * This class provides the core functionality for predicting tracks in a sequence of images.
  */
 class BaseTrackerPredictor : public torch::nn::Module {
 public:
     /**
      * @brief Construct a new BaseTrackerPredictor object
-     *
+     * 
      * @param stride Stride of the feature maps
      * @param corr_levels Number of correlation levels
      * @param corr_radius Correlation radius
@@ -40,12 +44,12 @@ public:
 
     /**
      * @brief Forward pass of the predictor
-     *
+     * 
      * @param query_points Query points tensor with shape [B, N, 2]
      * @param fmaps Feature maps tensor with shape [B, S, C, HH, WW]
      * @param iters Number of iterations
      * @param down_ratio Downsampling ratio
-     * @return std::tuple<std::vector<torch::Tensor>, torch::Tensor>
+     * @return std::tuple<std::vector<torch::Tensor>, torch::Tensor> 
      *         (coord_preds, vis_e)
      */
     std::tuple<std::vector<torch::Tensor>, torch::Tensor> forward(

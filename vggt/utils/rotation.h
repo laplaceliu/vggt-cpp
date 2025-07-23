@@ -1,7 +1,8 @@
-/**
- * @file rotation.h
- * @brief Rotation utility functions for VGGT
- */
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -10,37 +11,19 @@
 namespace vggt {
 namespace utils {
 
-/**
- * @brief Convert quaternion to rotation matrix
- *
- * @param quaternion Quaternion tensor of shape (..., 4)
- * @return torch::Tensor Rotation matrix tensor of shape (..., 3, 3)
- */
-torch::Tensor quat_to_mat(const torch::Tensor& quaternion);
+// Convert quaternions to rotation matrices.
+// Quaternion Order: XYZW (scalar-last).
+torch::Tensor quat_to_mat(const torch::Tensor& quaternions);
 
-/**
- * @brief Convert rotation matrix to quaternion
- *
- * @param rotation_matrix Rotation matrix tensor of shape (..., 3, 3)
- * @return torch::Tensor Quaternion tensor of shape (..., 4)
- */
-torch::Tensor mat_to_quat(const torch::Tensor& rotation_matrix);
+// Convert rotation matrices to quaternions.
+// Quaternion Order: XYZW (scalar-last).
+torch::Tensor mat_to_quat(const torch::Tensor& matrix);
 
-/**
- * @brief Standardize quaternion to have non-negative real part
- *
- * @param quaternion Quaternion tensor of shape (..., 4)
- * @return torch::Tensor Standardized quaternion tensor of shape (..., 4)
- */
-torch::Tensor standardize_quaternion(const torch::Tensor& quaternion);
-
-/**
- * @brief Helper function to compute the square root of the positive part
- *
- * @param x Input tensor
- * @return torch::Tensor Square root of max(0, x)
- */
+// Helper function for sqrt of positive part.
 torch::Tensor _sqrt_positive_part(const torch::Tensor& x);
+
+// Standardize quaternion to have non-negative real part.
+torch::Tensor standardize_quaternion(const torch::Tensor& quaternions);
 
 } // namespace utils
 } // namespace vggt
