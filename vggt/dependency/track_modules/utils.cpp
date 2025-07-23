@@ -76,7 +76,7 @@ torch::Tensor get_2d_embedding(const torch::Tensor& xy, int C, bool cat_coords) 
 }
 
 // Bilinear sampling
-torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& coords, bool align_corners, const std::string& padding_mode) {
+torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& coords, bool align_corners, const torch::nn::functional::GridSampleFuncOptions::padding_mode_t& padding_mode) {
     auto sizes = input.sizes().slice(2);
     assert(sizes.size() == 2 || sizes.size() == 3);
 
@@ -97,7 +97,7 @@ torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& 
 
     coords_modified = coords_modified - 1.0;
 
-    return torch::nn::functional::grid_sample(input, coords_modified, torch::nn::functional::GridSampleFuncOptions().align_corners(align_corners).padding_mode(torch::kZeros));
+    return torch::nn::functional::grid_sample(input, coords_modified, torch::nn::functional::GridSampleFuncOptions().align_corners(align_corners).padding_mode(padding_mode));
 }
 
 // Sample spatial features
