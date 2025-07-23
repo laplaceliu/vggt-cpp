@@ -15,7 +15,7 @@ torch::Tensor get_1d_sincos_pos_embed_from_grid(int embed_dim, const torch::Tens
 torch::Tensor get_2d_embedding(const torch::Tensor& xy, int C, bool cat_coords = true);
 
 // Bilinear sampling
-torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& coords, bool align_corners = true, const std::string& padding_mode = "border");
+torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& coords, bool align_corners = true, const torch::nn::functional::GridSampleFuncOptions::padding_mode_t& padding_mode = torch::kBorder);
 
 // Sample spatial features
 torch::Tensor sample_features4d(const torch::Tensor& input, const torch::Tensor& coords);

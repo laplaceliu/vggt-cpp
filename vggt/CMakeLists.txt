@@ -37,6 +37,3 @@ target_link_libraries(vggt
 
 # 设置编译选项
 target_compile_features(vggt PUBLIC cxx_std_17)
-
-# Add subdirectories
-add_subdirectory(models)

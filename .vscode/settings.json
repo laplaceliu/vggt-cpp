@@ -3,6 +3,7 @@
     "argparse",
     "Caffe",
     "cgal",
+    "corrs",
     "CUBLAS",
     "CUDA",
     "CUDNN",
@@ -10,9 +11,11 @@
     "dcgan",
     "DCMAKE",
     "DOPENCV",
+    "downsample",
     "DWITH",
     "EIGEN",
     "flann",
+    "GELU",
     "gflags",
     "glog",
     "googletest",
@@ -48,6 +51,7 @@
     "rope": "cpp",
     "variant": "cpp",
     "chrono": "cpp",
-    "tuple": "cpp"
+    "tuple": "cpp",
+    "optional": "cpp"
   }
 }
