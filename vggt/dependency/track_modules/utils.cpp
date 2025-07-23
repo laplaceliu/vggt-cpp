@@ -1,200 +1,119 @@
-/**
- * @file utils.cpp
- * @brief Implementation of utility functions for tracking modules
- *
- * Modified from https://github.com/facebookresearch/PoseDiffusion
- * and https://github.com/facebookresearch/co-tracker/tree/main
- */
-
 #include "utils.h"
-#include <cmath>
-#include <stdexcept>
 
 namespace vggt {
+namespace dependency {
+namespace track_modules {
 
-namespace {
-    // Helper function to rearrange tensor dimensions (simplified version of einops.rearrange)
-    torch::Tensor rearrange(torch::Tensor tensor, const std::string& pattern) {
-        if (pattern == "m,d->md") {
-            // Outer product
-            auto m_size = tensor.sizes()[0];
-            auto d_size = tensor.sizes()[1];
-            return tensor.unsqueeze(1).expand({m_size, d_size});
-        } else {
-            throw std::runtime_error("Unsupported rearrange pattern: " + pattern);
-        }
-    }
-}
-
-std::variant<torch::Tensor, std::tuple<torch::Tensor, torch::Tensor>> get_2d_sincos_pos_embed(
-    int embed_dim,
-    std::variant<int, std::tuple<int, int>> grid_size,
-    bool return_grid
-) {
-    int grid_size_h, grid_size_w;
-
-    if (std::holds_alternative<int>(grid_size)) {
-        grid_size_h = grid_size_w = std::get<int>(grid_size);
-    } else {
-        auto [h, w] = std::get<std::tuple<int, int>>(grid_size);
-        grid_size_h = h;
-        grid_size_w = w;
-    }
+// 2D sine-cosine positional embedding
+torch::Tensor get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& grid_size, bool return_grid) {
+    int grid_size_h = grid_size.first;
+    int grid_size_w = grid_size.second;
 
     auto grid_h = torch::arange(grid_size_h, torch::kFloat);
     auto grid_w = torch::arange(grid_size_w, torch::kFloat);
+    auto grid = torch::meshgrid({grid_w, grid_h}, "xy");
+    auto stacked_grid = torch::stack({grid[0], grid[1]}, 0);
+    stacked_grid = stacked_grid.reshape({2, 1, grid_size_h, grid_size_w});
+    auto grid_tensor = stacked_grid;
 
-    // Create meshgrid
-    auto grid_y = grid_h.unsqueeze(1).expand({grid_size_h, grid_size_w});
-    auto grid_x = grid_w.unsqueeze(0).expand({grid_size_h, grid_size_w});
-
-    auto grid = torch::stack({grid_x, grid_y}, 0);
-    grid = grid.reshape({2, 1, grid_size_h, grid_size_w});
-
-    auto pos_embed = get_2d_sincos_pos_embed_from_grid(embed_dim, grid);
-    auto reshaped_embed = pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2});
-
+    auto pos_embed = get_2d_sincos_pos_embed_from_grid(embed_dim, stacked_grid);
     if (return_grid) {
-        return std::tuple<torch::Tensor, torch::Tensor>(reshaped_embed, grid);
+        return torch::cat({pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2}), stacked_grid}, 0);
     }
-
-    return reshaped_embed;
+    return pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2});
 }
 
-torch::Tensor get_2d_sincos_pos_embed_from_grid(int embed_dim, torch::Tensor grid) {
-    if (embed_dim % 2 != 0) {
-        throw std::invalid_argument("Embedding dimension must be even");
-    }
+torch::Tensor get_2d_sincos_pos_embed_from_grid(int embed_dim, const torch::Tensor& grid) {
+    assert(embed_dim % 2 == 0);
 
-    // Use half of dimensions to encode grid_h
-    auto emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim / 2, grid[0]);  // (1, H*W, D/2)
-    auto emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim / 2, grid[1]);  // (1, H*W, D/2)
+    auto emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim / 2, grid[0]); // (H*W, D/2)
+    auto emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim / 2, grid[1]); // (H*W, D/2)
 
-    auto emb = torch::cat({emb_h, emb_w}, 2);  // (1, H*W, D)
-    return emb;
+    return torch::cat({emb_h, emb_w}, 2); // (H*W, D)
 }
 
-torch::Tensor get_1d_sincos_pos_embed_from_grid(int embed_dim, torch::Tensor pos) {
-    if (embed_dim % 2 != 0) {
-        throw std::invalid_argument("Embedding dimension must be even");
-    }
+torch::Tensor get_1d_sincos_pos_embed_from_grid(int embed_dim, const torch::Tensor& pos) {
+    assert(embed_dim % 2 == 0);
 
     auto omega = torch::arange(embed_dim / 2, torch::kDouble);
-    omega = omega / (embed_dim / 2.0);
-    omega = 1.0 / torch::pow(10000.0, omega);  // (D/2,)
+    omega /= embed_dim / 2.0;
+    omega = 1.0 / torch::pow(10000.0, omega); // (D/2,)
 
-    pos = pos.reshape({-1});  // (M,)
+    auto pos_flat = pos.reshape({-1}); // (M,)
+    auto out = torch::einsum("m,d->md", {pos_flat, omega}); // (M, D/2), outer product
 
-    // Outer product
-    auto out = pos.unsqueeze(1) * omega.unsqueeze(0);  // (M, D/2)
+    auto emb_sin = torch::sin(out); // (M, D/2)
+    auto emb_cos = torch::cos(out); // (M, D/2)
 
-    auto emb_sin = torch::sin(out);  // (M, D/2)
-    auto emb_cos = torch::cos(out);  // (M, D/2)
-
-    auto emb = torch::cat({emb_sin, emb_cos}, 1);  // (M, D)
-    return emb.unsqueeze(0).to(torch::kFloat);  // (1, M, D)
+    return torch::cat({emb_sin, emb_cos}, 1).unsqueeze(0).to(torch::kFloat); // (M, D)
 }
 
-torch::Tensor get_2d_embedding(torch::Tensor xy, int C, bool cat_coords) {
-    auto sizes = xy.sizes();
-    int B = sizes[0];
-    int N = sizes[1];
-    int D = sizes[2];
+// 2D embedding from coordinates
+torch::Tensor get_2d_embedding(const torch::Tensor& xy, int C, bool cat_coords) {
+    auto B = xy.size(0);
+    auto N = xy.size(1);
+    assert(xy.size(2) == 2);
 
-    if (D != 2) {
-        throw std::invalid_argument("Input tensor must have shape (B, N, 2)");
-    }
+    auto x = xy.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}).unsqueeze(2);
+    auto y = xy.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}).unsqueeze(2);
 
-    auto x = xy.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}).unsqueeze(-1);
-    auto y = xy.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}).unsqueeze(-1);
+    auto div_term = torch::arange(0, C, 2, torch::kFloat32).reshape({1, 1, C / 2}).to(xy.device());
+    div_term = div_term * (1000.0 / C);
 
-    auto div_term = torch::arange(0, C, 2, xy.options().dtype(torch::kFloat32)) * (1000.0 / C);
-    div_term = div_term.reshape({1, 1, C / 2});
+    auto pe_x = torch::zeros({B, N, C}, torch::kFloat32).to(xy.device());
+    pe_x.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, C, 2)}, torch::sin(x * div_term));
+    pe_x.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, C, 2)}, torch::cos(x * div_term));
 
-    auto pe_x = torch::zeros({B, N, C}, xy.options().dtype(torch::kFloat32));
-    auto pe_y = torch::zeros({B, N, C}, xy.options().dtype(torch::kFloat32));
+    auto pe_y = torch::zeros({B, N, C}, torch::kFloat32).to(xy.device());
+    pe_y.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, C, 2)}, torch::sin(y * div_term));
+    pe_y.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, C, 2)}, torch::cos(y * div_term));
 
-    pe_x.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, torch::indexing::None, 2)},
-                   torch::sin(x * div_term));
-    pe_x.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None, 2)},
-                   torch::cos(x * div_term));
-
-    pe_y.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, torch::indexing::None, 2)},
-                   torch::sin(y * div_term));
-    pe_y.index_put_({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, torch::indexing::None, 2)},
-                   torch::cos(y * div_term));
-
-    auto pe = torch::cat({pe_x, pe_y}, 2);  // (B, N, C*2)
-
+    auto pe = torch::cat({pe_x, pe_y}, 2); // (B, N, C*2)
     if (cat_coords) {
-        pe = torch::cat({xy, pe}, 2);  // (B, N, C*2+2)
+        pe = torch::cat({xy, pe}, 2); // (B, N, C*2+2)
     }
-
     return pe;
 }
 
-torch::Tensor bilinear_sampler(
-    torch::Tensor input,
-    torch::Tensor coords,
-    bool align_corners,
-    const std::string& padding_mode
-) {
-    auto sizes = input.sizes();
-    auto ndim = sizes.size();
+// Bilinear sampling
+torch::Tensor bilinear_sampler(const torch::Tensor& input, const torch::Tensor& coords, bool align_corners, const std::string& padding_mode) {
+    auto sizes = input.sizes().slice(2);
+    assert(sizes.size() == 2 || sizes.size() == 3);
 
-    if (ndim != 4 && ndim != 5) {
-        throw std::invalid_argument("Input tensor must be 4D or 5D");
-    }
-
-    auto coords_sizes = coords.sizes();
-    auto coords_ndim = coords_sizes.size();
-
-    if (coords_ndim != 4) {
-        throw std::invalid_argument("Coords tensor must be 4D");
-    }
-
-    if (ndim == 5) {
+    auto coords_modified = coords;
+    if (sizes.size() == 3) {
         // t x y -> x y t to match dimensions T H W in grid_sample
-        coords = coords.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(),
-                              Tensor({1, 2, 0})});
+        coords_modified = coords_modified.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(1, 3)});
+        coords_modified = torch::cat({coords_modified, coords_modified.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(), 0}).unsqueeze(3)}, 3);
     }
 
-    std::vector<float> scale_factors;
-    for (int i = ndim - 1; i >= 2; --i) {
-        float scale;
-        if (align_corners) {
-            scale = 2.0f / std::max(static_cast<int64_t>(1), sizes[i] - 1);
-        } else {
-            scale = 2.0f / sizes[i];
-        }
-        scale_factors.push_back(scale);
+    if (align_corners) {
+        auto scale_factors = torch::tensor({2.0 / (sizes[1] - 1), 2.0 / (sizes[0] - 1)}, torch::kFloat32).to(coords.device());
+        coords_modified = coords_modified * scale_factors;
+    } else {
+        auto scale_factors = torch::tensor({2.0 / sizes[1], 2.0 / sizes[0]}, torch::kFloat32).to(coords.device());
+        coords_modified = coords_modified * scale_factors;
     }
 
-    auto scale_tensor = torch::tensor(scale_factors, coords.options());
-    coords = coords * scale_tensor.unsqueeze(0).unsqueeze(0).unsqueeze(0);
-    coords = coords - 1;
+    coords_modified = coords_modified - 1.0;
 
-    return torch::nn::functional::grid_sample(
-        input,
-        coords,
-        torch::nn::functional::GridSampleFuncOptions()
-            .align_corners(align_corners)
-            .padding_mode(padding_mode)
-            .mode("bilinear")
-    );
+    return torch::nn::functional::grid_sample(input, coords_modified, torch::nn::functional::GridSampleFuncOptions().align_corners(align_corners).padding_mode(torch::kZeros));
 }
 
-torch::Tensor sample_features4d(torch::Tensor input, torch::Tensor coords) {
-    auto sizes = input.sizes();
-    int B = sizes[0];
+// Sample spatial features
+torch::Tensor sample_features4d(const torch::Tensor& input, const torch::Tensor& coords) {
+    auto B = input.size(0);
+    auto C = input.size(1);
 
     // B R 2 -> B R 1 2
-    coords = coords.unsqueeze(2);
+    auto coords_reshaped = coords.unsqueeze(2);
 
     // B C R 1
-    auto feats = bilinear_sampler(input, coords);
+    auto feats = bilinear_sampler(input, coords_reshaped);
 
-    return feats.permute({0, 2, 1, 3}).reshape({B, -1, feats.sizes()[1] * feats.sizes()[3]});  // B C R 1 -> B R C
+    return feats.permute({0, 2, 1, 3}).reshape({B, -1, C * feats.size(3)}); // B R C
 }
 
+} // namespace track_modules
+} // namespace dependency
 } // namespace vggt
