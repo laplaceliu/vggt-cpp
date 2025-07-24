@@ -66,6 +66,22 @@ build_freeimage() {
     rm -rf $TMP_DIR
 }
 
+build_einops() {
+    TMP_DIR=$(mktemp -d)
+    pushd $TMP_DIR
+
+    NAME=einops-cpp
+    SOURCE=$NAME.tar.gz
+    tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
+
+    pushd $TMP_DIR/$NAME
+    mkdir $DEPENDENCIES_INSTALL_DIR/include/einops/
+    cp -r include/* $DEPENDENCIES_INSTALL_DIR/include/einops/
+    popd
+
+    rm -rf $TMP_DIR
+}
+
 build_metis() {
     TMP_DIR=$(mktemp -d)
     pushd $TMP_DIR
@@ -488,6 +504,8 @@ else
     for param in "$@"; do
         if [ $param = "argparse" ]; then
             build_argparse
+        elif [ $param = "einops" ]; then
+            build_einops
         elif [ $param = "eigen" ]; then
             build_eigen
         elif [ $param = "eigen_master" ]; then
