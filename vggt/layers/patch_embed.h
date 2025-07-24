@@ -3,7 +3,7 @@
 #include <torch/torch.h>
 
 namespace vggt {
-
+namespace layers {
 inline std::tuple<int64_t, int64_t> make_2tuple(int64_t x) {
     return std::make_tuple(x, x);
 }
@@ -38,5 +38,5 @@ private:
 };
 
 TORCH_MODULE(PatchEmbed);
-
+}
 } // namespace vggt

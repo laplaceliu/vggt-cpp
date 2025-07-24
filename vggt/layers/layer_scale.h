@@ -3,7 +3,7 @@
 #include <torch/torch.h>
 
 namespace vggt {
-
+namespace layers {
 class LayerScaleImpl : public torch::nn::Module {
 public:
     LayerScaleImpl(int64_t dim, torch::Tensor init_values, bool inplace = false);
@@ -16,5 +16,5 @@ private:
 };
 
 TORCH_MODULE(LayerScale);
-
+}
 } // namespace vggt

@@ -4,7 +4,7 @@
 #include <functional>
 
 namespace vggt {
-
+namespace layers {
 torch::Tensor PositionGetter::operator()(int64_t batch_size, int64_t height, int64_t width, const torch::Device& device) {
     auto key = std::make_pair(height, width);
     if (position_cache_.find(key) == position_cache_.end()) {
@@ -74,5 +74,5 @@ torch::Tensor RotaryPositionEmbedding2DImpl::forward(torch::Tensor tokens, torch
 
     return torch::cat({vertical_features, horizontal_features}, -1);
 }
-
+}
 } // namespace vggt
