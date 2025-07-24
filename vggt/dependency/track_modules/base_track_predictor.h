@@ -1,8 +1,10 @@
 #pragma once
 
 #include <torch/torch.h>
-#include <vector>
+#include <einops.hpp>
+#include <variant>
 #include "blocks.h"
+#include "utils.h"
 
 namespace vggt {
 namespace dependency {
@@ -21,9 +23,12 @@ public:
         bool fine = false
     );
 
-    std::tuple<std::vector<torch::Tensor>, torch::Tensor> forward(
+    std::variant<
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor>,
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>
+    > forward(
         torch::Tensor query_points,
-        torch::Tensor fmaps = torch::Tensor(),
+        torch::Tensor fmaps,
         int64_t iters = 4,
         bool return_feat = false,
         int64_t down_ratio = 1
@@ -37,21 +42,20 @@ public:
     );
 
 private:
-    int64_t stride_;
-    int64_t latent_dim_;
-    int64_t corr_levels_;
-    int64_t corr_radius_;
-    int64_t hidden_size_;
-    bool fine_;
-    int64_t flows_emb_dim_;
-    int64_t transformer_dim_;
+    int64_t stride;
+    int64_t latent_dim;
+    int64_t corr_levels;
+    int64_t corr_radius;
+    int64_t hidden_size;
+    bool fine;
+    int64_t flows_emb_dim;
+    int64_t transformer_dim;
 
-    EfficientUpdateFormer updateformer_{nullptr};
-    torch::nn::GroupNorm norm_{nullptr};
-    torch::nn::Sequential ffeat_updater_{nullptr};
-    torch::nn::Sequential vis_predictor_{nullptr};
+    EfficientUpdateFormer updateformer{nullptr};
+    torch::nn::GroupNorm norm{nullptr};
+    torch::nn::Sequential ffeat_updater{nullptr};
+    torch::nn::Sequential vis_predictor{nullptr};
 };
-
 TORCH_MODULE(BaseTrackerPredictor);
 
 } // namespace track_modules
