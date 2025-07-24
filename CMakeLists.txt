@@ -43,6 +43,7 @@ include_directories(
 # 添加vggt子目录
 ################################################################################
 add_subdirectory(vggt)
+target_compile_definitions(vggt PUBLIC EINOPS_TORCH_BACKEND)
 
 ################################################################################
 # ${PROJECT_NAME}
