@@ -7,7 +7,7 @@
 #include <tuple>
 
 namespace vggt {
-
+namespace layers {
 struct PairHash {
     size_t operator()(const std::pair<int64_t, int64_t>& key) const {
         auto hash_combine = [](size_t seed, size_t value) {
@@ -67,5 +67,5 @@ private:
 };
 
 TORCH_MODULE(RotaryPositionEmbedding2D);
-
+}
 } // namespace vggt

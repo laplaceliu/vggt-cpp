@@ -1,7 +1,7 @@
 #include "patch_embed.h"
 
 namespace vggt {
-
+namespace layers {
 PatchEmbedImpl::PatchEmbedImpl(
     int64_t img_size,
     int64_t patch_size,
@@ -50,5 +50,5 @@ torch::Tensor PatchEmbedImpl::forward(torch::Tensor x) {
     }
     return x;
 }
-
+}
 } // namespace vggt
