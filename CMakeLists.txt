@@ -36,6 +36,7 @@ include_directories(
     ${DEPENDENCIES}/include
     ${DEPENDENCIES}/include/opencv4
     ${DEPENDENCIES}/include/eigen3
+    ${DEPENDENCIES}/include/einops
 })
 
 ################################################################################
