@@ -15,6 +15,7 @@
     "DWITH",
     "EIGEN",
     "einops",
+    "einsum",
     "flann",
     "GELU",
     "gflags",
@@ -32,6 +33,7 @@
     "relu",
     "Tensorpipe",
     "THIRDPARTY",
+    "unsqueeze",
     "vggsfm",
     "vggt"
   ],
