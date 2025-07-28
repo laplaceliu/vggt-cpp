@@ -33,6 +33,7 @@ target_link_libraries(vggt
     spdlog::spdlog
     ${CUDA_LIBRARIES}
     vpi
+    Matplot++::matplot
 )
 
 # 设置编译选项
