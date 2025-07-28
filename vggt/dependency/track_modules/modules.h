@@ -3,20 +3,11 @@
 #include <torch/torch.h>
 #include <vector>
 #include <functional>
+#include "utils/stack_sequential.h"
 
 namespace vggt {
 namespace dependency {
 namespace track_modules {
-
-struct StackSequentialImpl : torch::nn::SequentialImpl {
-    using SequentialImpl::SequentialImpl;
-    torch::Tensor forward(torch::Tensor x) {
-        return torch::nn::SequentialImpl::forward(x);
-    }
-};
-TORCH_MODULE(StackSequential);
-
-
 
 // From PyTorch internals
 inline std::vector<int64_t> _ntuple(int n, int64_t x) {
@@ -47,7 +38,7 @@ private:
     torch::nn::Conv2d conv1{nullptr}, conv2{nullptr};
     torch::nn::ReLU relu{nullptr};
     torch::nn::AnyModule norm1, norm2, norm3;
-    StackSequential downsample{nullptr};
+    utils::StackSequential downsample{nullptr};
 };
 TORCH_MODULE(ResidualBlock);
 

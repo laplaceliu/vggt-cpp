@@ -89,7 +89,7 @@ ShallowEncoderImpl::ShallowEncoderImpl(int64_t input_dim, int64_t output_dim, in
         norm1 = register_module("norm1", torch::nn::InstanceNorm2d(this->in_planes));
         norm2 = register_module("norm2", torch::nn::InstanceNorm2d(output_dim * 2));
     } else if (this->norm_fn == "none") {
-        norm1 = register_module("norm1", StackSequential());
+        norm1 = register_module("norm1", utils::StackSequential());
     }
 
     conv1 = register_module("conv1", torch::nn::Conv2d(torch::nn::Conv2dOptions(input_dim, this->in_planes, 3)
