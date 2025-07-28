@@ -32,10 +32,10 @@ ResidualBlockImpl::ResidualBlockImpl(int64_t in_planes, int64_t planes, const st
             norm3 = register_module("norm3", torch::nn::InstanceNorm2d(planes));
         }
     } else if (norm_fn == "none") {
-        norm1 = register_module("norm1", StackSequential());
-        norm2 = register_module("norm2", StackSequential());
+        norm1 = register_module("norm1", utils::StackSequential());
+        norm2 = register_module("norm2", utils::StackSequential());
         if (stride != 1) {
-            norm3 = register_module("norm3", StackSequential());
+            norm3 = register_module("norm3", utils::StackSequential());
         }
     } else {
         throw std::runtime_error("Norm function not implemented");
@@ -44,7 +44,7 @@ ResidualBlockImpl::ResidualBlockImpl(int64_t in_planes, int64_t planes, const st
     if (stride == 1) {
         downsample = nullptr;
     } else {
-        downsample = register_module("downsample", StackSequential(
+        downsample = register_module("downsample", utils::StackSequential(
             torch::nn::Conv2d(torch::nn::Conv2dOptions(in_planes, planes, 1).stride(stride)),
             norm3
         ));
