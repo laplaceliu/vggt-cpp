@@ -171,6 +171,48 @@ build_ceres() {
     rm -rf $TMP_DIR
 }
 
+build_matplot() {
+    TMP_DIR=$(mktemp -d)
+    pushd $TMP_DIR
+
+    NAME=glad-0.1.36
+    SOURCE=$NAME.tar.gz
+    tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
+
+    pushd $TMP_DIR/$NAME
+    mkdir build && cd build
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_BUILD_TYPE=MinSizeRel \
+        -DGLAD_INSTALL=ON
+
+    make -j
+    make install
+    popd
+
+    NAME=matplotplusplus-1.2.2
+    SOURCE=$NAME.tar.gz
+    tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
+
+    pushd $TMP_DIR/$NAME
+    mkdir build && cd build
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_BUILD_TYPE=MinSizeRel       \
+        -DMATPLOTPP_BUILD_EXAMPLES=OFF      \
+        -DMATPLOTPP_BUILD_SHARED_LIBS=OFF   \
+        -DMATPLOTPP_BUILD_TESTS=OFF         \
+        -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+        -DMATPLOTPP_BUILD_EXPERIMENTAL_OPENGL_BACKEND=ON \
+        -Dglad_DIR=$DEPENDENCIES_INSTALL_DIR/lib/cmake/glad
+
+    make -j
+    make install
+    popd
+
+    rm -rf $TMP_DIR
+}
+
 build_mpfr() {
     TMP_DIR=$(mktemp -d)
 
@@ -518,6 +560,8 @@ else
             build_cgal
         elif [ $param = "flann" ]; then
             build_flann
+        elif [ $param = "matplot" ]; then
+            build_matplot
         elif [ $param = "metis" ]; then
             build_metis
         elif [ $param = "poselib" ]; then
