@@ -113,6 +113,8 @@
     "thread": "cpp",
     "typeindex": "cpp",
     "typeinfo": "cpp",
-    "filesystem": "cpp"
+    "filesystem": "cpp",
+    "__threading_support": "cpp",
+    "semaphore": "cpp"
   }
 }
