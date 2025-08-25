@@ -5,17 +5,45 @@ DEPENDENCIES_INSTALL_DIR=$(pwd)/dependencies
 export CMAKE_LIBRARY_PATH=$DEPENDENCIES_INSTALL_DIR/lib:$CMAKE_LIBRARY_PATH
 export CMAKE_INCLUDE_PATH=$DEPENDENCIES_INSTALL_DIR/include:$CMAKE_INCLUDE_PATH
 
+# Create directories if they don't exist
+mkdir -p $THIRDPARTY_SOURCE_DIR
+mkdir -p $DEPENDENCIES_INSTALL_DIR
+
+# Function to download source package if it doesn't exist
+download_if_not_exists() {
+    local name=$1
+    local url=$2
+    local output_file="$THIRDPARTY_SOURCE_DIR/$name"
+
+    if [ ! -f "$output_file" ]; then
+        echo "Downloading $name from $url..."
+        wget -O "$output_file" "$url" || curl -L "$url" -o "$output_file"
+        if [ $? -ne 0 ]; then
+            echo "Failed to download $name"
+            return 1
+        fi
+        echo "Downloaded $name successfully"
+    else
+        echo "$name already exists, skipping download"
+    fi
+    return 0
+}
+
 build_argparse() {
     TMP_DIR=$(mktemp -d)
 
     NAME=argparse-3.2
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/p-ranav/argparse/archive/refs/tags/v3.2.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DARGPARSE_BUILD_SAMPLES=off \
         -DARGPARSE_BUILD_TESTS=off
@@ -31,12 +59,16 @@ build_cgal() {
 
     NAME=cgal-6.0.1
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/CGAL/cgal/archive/refs/tags/v6.0.1.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel
 
     make -j
@@ -51,12 +83,16 @@ build_freeimage() {
 
     NAME=FreeImage-3.19.10
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/danoli3/FreeImage/archive/refs/tags/3.19.10.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel
 
     make -j
@@ -72,6 +108,9 @@ build_einops() {
 
     NAME=einops-cpp
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/dorpxam/einops-cpp.git"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -87,7 +126,18 @@ build_metis() {
     pushd $TMP_DIR
 
     NAME=GKlib
-    git clone https://github.com/KarypisLab/$NAME.git
+    REPO_URL="https://github.com/KarypisLab/$NAME.git"
+
+    if [ ! -d "$THIRDPARTY_SOURCE_DIR/$NAME" ]; then
+        echo "Cloning $NAME from $REPO_URL..."
+        git clone $REPO_URL "$THIRDPARTY_SOURCE_DIR/$NAME"
+        if [ $? -ne 0 ]; then
+            echo "Failed to clone $NAME"
+            return 1
+        fi
+    fi
+
+    cp -r "$THIRDPARTY_SOURCE_DIR/$NAME" .
     pushd $TMP_DIR/$NAME
     make config prefix=$DEPENDENCIES_INSTALL_DIR
     make -j
@@ -115,12 +165,16 @@ build_openblas() {
 
     NAME=OpenBLAS-0.3.30
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v0.3.30.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel
 
     make -j
@@ -135,6 +189,9 @@ build_boost() {
 
     NAME=boost_1_88_0
     SOURCE=$NAME.tar.gz
+    URL="https://boostorg.jfrog.io/artifactory/main/release/1.88.0/source/boost_1_88_0.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -151,12 +208,16 @@ build_ceres() {
 
     NAME=ceres-solver-2.2.0
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/ceres-solver/ceres-solver/archive/refs/tags/2.2.0.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DBUILD_TESTING=OFF \
         -DBUILD_EXAMPLES=OFF \
@@ -177,12 +238,16 @@ build_matplot() {
 
     NAME=glad-0.1.36
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/Dav1dde/glad/archive/refs/tags/v0.1.36.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DGLAD_INSTALL=ON
 
@@ -192,12 +257,16 @@ build_matplot() {
 
     NAME=matplotplusplus-1.2.2
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/alandefreitas/matplotplusplus/archive/refs/tags/v1.2.2.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel       \
         -DMATPLOTPP_BUILD_EXAMPLES=OFF      \
         -DMATPLOTPP_BUILD_SHARED_LIBS=OFF   \
@@ -217,8 +286,19 @@ build_mpfr() {
     TMP_DIR=$(mktemp -d)
 
     NAME=mpfr
+    REPO_URL="https://github.com/aixoss/$NAME.git"
     pushd $TMP_DIR
-    git clone https://github.com/aixoss/$NAME.git
+
+    if [ ! -d "$THIRDPARTY_SOURCE_DIR/$NAME" ]; then
+        echo "Cloning $NAME from $REPO_URL..."
+        git clone $REPO_URL "$THIRDPARTY_SOURCE_DIR/$NAME"
+        if [ $? -ne 0 ]; then
+            echo "Failed to clone $NAME"
+            return 1
+        fi
+    fi
+
+    cp -r "$THIRDPARTY_SOURCE_DIR/$NAME" .
 
     pushd $TMP_DIR/$NAME
     ./configure --prefix=$DEPENDENCIES_INSTALL_DIR
@@ -235,6 +315,9 @@ build_poselib() {
 
     NAME=PoseLib-9c8f3ca
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/vlarsson/PoseLib/archive/9c8f3ca.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -242,6 +325,7 @@ build_poselib() {
 
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DWITH_BENCHMARK=OFF \
         -DPYTHON_PACKAGE=OFF
@@ -263,12 +347,16 @@ build_flann() {
 
     NAME=flann-1.9.2
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/flann-lib/flann/archive/refs/tags/1.9.2.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DCMAKE_CUDA_ARCHITECTURES=native \
         -DBUILD_MATLAB_BINDINGS=OFF \
@@ -295,12 +383,16 @@ build_colmap() {
 
     NAME=colmap-3.10
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/colmap/colmap/archive/refs/tags/3.10.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DCMAKE_CUDA_ARCHITECTURES=native \
         -DBLA_VENDOR=Intel10_64lp
@@ -317,12 +409,16 @@ build_eigen() {
 
     NAME=eigen-3.3.9
     SOURCE=$NAME.tar.gz
+    URL="https://gitlab.com/libeigen/eigen/-/archive/3.3.9/eigen-3.3.9.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTING=OFF \
         -DEIGEN_BUILD_DOC=OFF
@@ -337,13 +433,25 @@ build_eigen_master() {
     TMP_DIR=$(mktemp -d)
 
     NAME=eigen
+    REPO_URL="https://gitlab.com/libeigen/$NAME.git"
     pushd $TMP_DIR
-    git clone https://gitlab.com/libeigen/$NAME.git
+
+    if [ ! -d "$THIRDPARTY_SOURCE_DIR/$NAME" ]; then
+        echo "Cloning $NAME from $REPO_URL..."
+        git clone $REPO_URL "$THIRDPARTY_SOURCE_DIR/$NAME"
+        if [ $? -ne 0 ]; then
+            echo "Failed to clone $NAME"
+            return 1
+        fi
+    fi
+
+    cp -r "$THIRDPARTY_SOURCE_DIR/$NAME" .
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DBUILD_TESTING=OFF \
         -DEIGEN_BUILD_DOC=OFF
@@ -360,6 +468,9 @@ build_gflags() {
 
     NAME=gflags-2.2.2
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -367,6 +478,7 @@ build_gflags() {
 
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DBUILD_SHARED_LIBS=OFF \
         -DBUILD_TESTING=OFF
@@ -384,6 +496,9 @@ build_gtest() {
 
     NAME=googletest-1.17.0
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -391,6 +506,7 @@ build_gtest() {
 
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel
 
     make -j
@@ -405,12 +521,16 @@ build_glog() {
 
     NAME=glog-0.7.1
     SOURCE=$NAME.tar.gz
+    URL="https://github.com/google/glog/archive/refs/tags/v0.7.1.tar.gz"
+
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DBUILD_EXAMPLES=OFF \
         -DBUILD_SHARED_LIBS=OFF
@@ -428,16 +548,23 @@ build_opencv() {
 
     CONTRIB_NAME=opencv_contrib-4.12.0
     CONTRIB_SOURCE=$CONTRIB_NAME.tar.gz
+    CONTRIB_URL="https://github.com/opencv/opencv_contrib/archive/refs/tags/4.12.0.tar.gz"
+
+    download_if_not_exists $CONTRIB_SOURCE "$CONTRIB_URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$CONTRIB_SOURCE -C $TMP_DIR
 
     OPENCV_NAME=opencv-4.12.0
     OPENCV_SOURCE=$OPENCV_NAME.tar.gz
+    OPENCV_URL="https://github.com/opencv/opencv/archive/refs/tags/4.12.0.tar.gz"
+
+    download_if_not_exists $OPENCV_SOURCE "$OPENCV_URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$OPENCV_SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/opencv-4.12.0
     mkdir build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DOPENCV_ENABLE_NONFREE=ON \
         -DOPENCV_DNN_CUDA=ON \
@@ -511,7 +638,9 @@ build_spdlog() {
     NAME=spdlog-1.12.0
     SOURCE=$NAME.tar.gz
     TMP_DIR=$(mktemp -d)
+    URL="https://github.com/gabime/spdlog/archive/refs/tags/v1.12.0.tar.gz"
 
+    download_if_not_exists $SOURCE "$URL" || return 1
     tar zxf $THIRDPARTY_SOURCE_DIR/$SOURCE -C $TMP_DIR
 
     pushd $TMP_DIR/$NAME
@@ -519,6 +648,7 @@ build_spdlog() {
 
     cmake .. \
         -DCMAKE_INSTALL_PREFIX=$DEPENDENCIES_INSTALL_DIR \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=MinSizeRel \
         -DSPDLOG_BUILD_EXAMPLE=OFF \
         -DSPDLOG_BUILD_TESTS=OFF \
