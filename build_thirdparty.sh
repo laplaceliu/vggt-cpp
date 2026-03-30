@@ -799,6 +799,7 @@ default() {
     build_eigen
     build_opencv
     build_spdlog
+    build_einops
 }
 
 if [ $# -eq 0 ]; then
