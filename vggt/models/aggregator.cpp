@@ -1,4 +1,5 @@
 #include "aggregator.h"
+#include "../layers/vision_transformer.h"
 #include <stdexcept>
 
 namespace vggt {
@@ -151,10 +152,20 @@ void AggregatorImpl::buildPatchEmbed(
         patch_embed_ = torch::nn::AnyModule(pe);
         register_module("patch_embed", patch_embed_.ptr());
     } else {
-        // TODO: Implement DINOv2 vision transformer models
-        auto pe = layers::PatchEmbed(img_size, patch_size, 3, embed_dim,
-                                     torch::nn::AnyModule(), true);
-        patch_embed_ = torch::nn::AnyModule(pe);
+        // DINOv2 vision transformer models
+        torch::nn::AnyModule vit_model;
+        if (patch_embed.find("vitl14") != std::string::npos) {
+            vit_model = torch::nn::AnyModule(layers::vit_large(patch_size, num_register_tokens));
+        } else if (patch_embed.find("vitb14") != std::string::npos) {
+            vit_model = torch::nn::AnyModule(layers::vit_base(patch_size, num_register_tokens));
+        } else if (patch_embed.find("vits14") != std::string::npos) {
+            vit_model = torch::nn::AnyModule(layers::vit_small(patch_size, num_register_tokens));
+        } else if (patch_embed.find("vitg2") != std::string::npos) {
+            vit_model = torch::nn::AnyModule(layers::vit_giant2(patch_size, num_register_tokens));
+        } else {
+            throw std::runtime_error("Unknown patch_embed type: " + patch_embed);
+        }
+        patch_embed_ = vit_model;
         register_module("patch_embed", patch_embed_.ptr());
     }
 }

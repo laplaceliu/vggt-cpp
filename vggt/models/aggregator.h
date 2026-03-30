@@ -7,6 +7,7 @@
 #include "../layers/block.h"
 #include "../layers/patch_embed.h"
 #include "../layers/rope.h"
+#include "../layers/vision_transformer.h"
 
 namespace vggt {
 namespace models {
