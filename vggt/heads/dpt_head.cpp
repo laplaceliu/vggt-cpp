@@ -177,11 +177,12 @@ torch::Tensor FeatureFusionBlockImpl::forward(
     const std::vector<torch::Tensor>& xs,
     c10::optional<std::pair<int64_t, int64_t>> size) {
 
-    TORCH_CHECK(xs.size() >= 2, "FeatureFusionBlock requires at least 2 inputs");
+    TORCH_CHECK(xs.size() >= 1, "FeatureFusionBlock requires at least 1 input");
+    TORCH_CHECK(!has_residual_ || xs.size() >= 2, "FeatureFusionBlock with has_residual=true requires at least 2 inputs");
 
     torch::Tensor output = xs[0];
 
-    if (has_residual_) {
+    if (has_residual_ && xs.size() >= 2) {
         torch::Tensor res = resConfUnit1->forward(xs[1]);
         output = torch::add(output, res);
     }
@@ -259,22 +260,26 @@ DPTHeadImpl::DPTHeadImpl(
     // resize_layers[1]: ConvTranspose2d 2x upsampling for layer 1 (512 -> 512)
     // resize_layers[2]: Identity for layer 2 (1024)
     // resize_layers[3]: Conv2d 2x downsampling for layer 3 (1024 -> 1024)
-    resize_layers_.push_back(torch::nn::AnyModule(
-        torch::nn::ConvTranspose2d(
-            torch::nn::ConvTranspose2dOptions(out_channels[0], out_channels[0], 4).stride(4).padding(0)
-        )
-    ));
-    resize_layers_.push_back(torch::nn::AnyModule(
-        torch::nn::ConvTranspose2d(
-            torch::nn::ConvTranspose2dOptions(out_channels[1], out_channels[1], 2).stride(2).padding(0)
-        )
-    ));
+    // Note: Must register modules first, then wrap in AnyModule
+    auto resize0 = torch::nn::ConvTranspose2d(
+        torch::nn::ConvTranspose2dOptions(out_channels[0], out_channels[0], 4).stride(4).padding(0)
+    );
+    register_module("resize0", resize0);
+    resize_layers_.push_back(torch::nn::AnyModule(resize0));
+    
+    auto resize1 = torch::nn::ConvTranspose2d(
+        torch::nn::ConvTranspose2dOptions(out_channels[1], out_channels[1], 2).stride(2).padding(0)
+    );
+    register_module("resize1", resize1);
+    resize_layers_.push_back(torch::nn::AnyModule(resize1));
+    
     resize_layers_.push_back(torch::nn::AnyModule(torch::nn::Identity()));
-    resize_layers_.push_back(torch::nn::AnyModule(
-        torch::nn::Conv2d(
-            torch::nn::Conv2dOptions(out_channels[3], out_channels[3], 3).stride(2).padding(1)
-        )
-    ));
+    
+    auto resize3 = torch::nn::Conv2d(
+        torch::nn::Conv2dOptions(out_channels[3], out_channels[3], 3).stride(2).padding(1)
+    );
+    register_module("resize3", resize3);
+    resize_layers_.push_back(torch::nn::AnyModule(resize3));
 
     // Create scratch modules (feature fusion)
     layer1_rn = register_module("layer1_rn", torch::nn::Conv2d(
@@ -378,8 +383,9 @@ std::tuple<torch::Tensor, torch::Tensor> DPTHeadImpl::forward_impl(
 
     int64_t B = images.size(0);
     int64_t S = images.size(1);
-    int64_t H = images.size(2);
-    int64_t W = images.size(3);
+    int64_t C = images.size(2);  // channels = 3
+    int64_t H = images.size(3);
+    int64_t W = images.size(4);
 
     int64_t patch_h = H / patch_size_;
     int64_t patch_w = W / patch_size_;
@@ -388,7 +394,8 @@ std::tuple<torch::Tensor, torch::Tensor> DPTHeadImpl::forward_impl(
     int64_t dpt_idx = 0;
 
     for (int64_t layer_idx : intermediate_layer_idx_) {
-        torch::Tensor x = aggregated_tokens_list[layer_idx].index({torch::indexing::Ellipsis, torch::indexing::Slice(patch_start_idx, torch::indexing::None)});
+        // Slice token dimension (dim 2) to remove special tokens (camera + register tokens)
+        torch::Tensor x = aggregated_tokens_list[layer_idx].slice(2, patch_start_idx);
 
         // Select frames if processing a chunk
         if (frames_start_idx.has_value() && frames_end_idx.has_value()) {

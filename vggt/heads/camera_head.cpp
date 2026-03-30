@@ -22,36 +22,43 @@ CameraHeadImpl::CameraHeadImpl(
     trans_act(trans_act),
     quat_act(quat_act),
     fl_act(fl_act),
-    trunk_depth(trunk_depth),
-    token_norm(torch::nn::LayerNormOptions({dim_in})),
-    trunk_norm(torch::nn::LayerNormOptions({dim_in})),
-    embed_pose(torch::nn::LinearOptions(target_dim, dim_in)),
-    adaln_norm(torch::nn::LayerNormOptions({dim_in}).elementwise_affine(false).eps(1e-6)) {
+    trunk_depth(trunk_depth) {
 
     if (pose_encoding_type != "absT_quaR_FoV") {
         throw std::runtime_error("Unsupported camera encoding type: " + pose_encoding_type);
     }
 
-    // Build the trunk
-    utils::StackSequential trunk;
+    // Register LayerNorm modules explicitly
+    token_norm = register_module("token_norm", torch::nn::LayerNorm(torch::nn::LayerNormOptions({dim_in})));
+    trunk_norm = register_module("trunk_norm", torch::nn::LayerNorm(torch::nn::LayerNormOptions({dim_in})));
+    adaln_norm = register_module("adaln_norm", torch::nn::LayerNorm(torch::nn::LayerNormOptions({dim_in}).elementwise_affine(false).eps(1e-6)));
+    
+    // Create embed_pose as a registered module
+    embed_pose = torch::nn::Linear(torch::nn::LinearOptions(target_dim, dim_in));
+    register_module("embed_pose", embed_pose);
+
+    // Build the trunk - use shared_ptr to avoid copying issues
+    auto trunk_ptr = std::make_shared<utils::StackSequentialImpl>();
     for (int64_t i = 0; i < trunk_depth; ++i) {
-        trunk->push_back(layers::Block(dim_in, num_heads, mlp_ratio, init_values));
+        trunk_ptr->push_back(layers::Block(dim_in, num_heads, mlp_ratio, init_values));
     }
-    register_module("trunk", trunk);
+    register_module("trunk", trunk_ptr);
+    trunk = utils::StackSequential(trunk_ptr);
 
     // Learnable empty camera pose token
     empty_pose_tokens = register_parameter("empty_pose_tokens", torch::zeros({1, 1, target_dim}));
 
-    // PoseLN modulation
-    poseLN_modulation = utils::StackSequential(
-        torch::nn::SiLU(),
-        torch::nn::Linear(torch::nn::LinearOptions(dim_in, 3 * dim_in).bias(true))
-    );
-    register_module("poseLN_modulation", poseLN_modulation);
+    // PoseLN modulation - use shared_ptr to avoid copying issues
+    auto poseLN_ptr = std::make_shared<utils::StackSequentialImpl>();
+    poseLN_ptr->push_back(torch::nn::SiLU());
+    poseLN_ptr->push_back(torch::nn::Linear(torch::nn::LinearOptions(dim_in, 3 * dim_in).bias(true)));
+    register_module("poseLN_modulation", poseLN_ptr);
+    poseLN_modulation = utils::StackSequential(poseLN_ptr);
 
-    // Pose branch
-    pose_branch = torch::nn::AnyModule(layers::Mlp(dim_in, dim_in / 2, target_dim));
-    register_module("pose_branch", pose_branch.ptr());
+    // Pose branch - use shared_ptr to avoid AnyModule copying issues
+    auto pose_branch_ptr = std::make_shared<layers::MlpImpl>(dim_in, dim_in / 2, target_dim, torch::nn::AnyModule(torch::nn::GELU()), 0.0, true);
+    register_module("pose_branch", pose_branch_ptr);
+    pose_branch = torch::nn::AnyModule(layers::Mlp(pose_branch_ptr));
 }
 
 std::vector<torch::Tensor> CameraHeadImpl::forward(const std::vector<torch::Tensor>& aggregated_tokens_list, int64_t num_iterations) {

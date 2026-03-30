@@ -1,6 +1,4 @@
 #include "aggregator.h"
-#include "../layers/vision_transformer.h"
-#include <stdexcept>
 
 namespace vggt {
 namespace models {
@@ -9,42 +7,62 @@ AggregatorImpl::AggregatorImpl(
     int64_t img_size,
     int64_t patch_size,
     int64_t embed_dim,
-    int64_t depth,
     int64_t num_heads,
     double mlp_ratio,
-    int64_t num_register_tokens,
     bool qkv_bias,
     bool proj_bias,
     bool ffn_bias,
+    int64_t depth,
+    double init_values,
     const std::string& patch_embed,
-    const std::vector<std::string>& aa_order,
-    int64_t aa_block_size,
+    int64_t num_register_tokens,
+    bool interpolate_antialias,
+    double interpolate_offset,
+    int64_t block_chunks,
     bool qk_norm,
-    double rope_freq,
-    double init_values
-) : depth_(depth),
-    aa_block_size_(aa_block_size),
-    aa_order_(aa_order),
-    patch_size_(patch_size) {
+    bool use_flex_attn
+) : img_size_(img_size),
+    patch_size_(patch_size),
+    embed_dim_(embed_dim),
+    depth_(depth),
+    num_register_tokens_(num_register_tokens),
+    patch_start_idx_(2 + num_register_tokens) {  // 2 camera tokens + register tokens
 
-    // Validate that depth is divisible by aa_block_size
-    if (depth_ % aa_block_size_ != 0) {
-        throw std::invalid_argument("depth must be divisible by aa_block_size");
+    // Build the patch embedding module
+    buildPatchEmbed(
+        patch_embed,
+        img_size,
+        patch_size,
+        num_register_tokens,
+        interpolate_antialias,
+        interpolate_offset,
+        block_chunks,
+        init_values,
+        embed_dim
+    );
+
+    // Create learnable tokens for camera and registers
+    // In Python: self.camera_token = nn.Parameter(torch.zeros(1, 1, 2, embed_dim))
+    camera_token_ = register_parameter("camera_token", torch::zeros({1, 1, 2, embed_dim}));
+
+    // Register tokens
+    if (num_register_tokens > 0) {
+        register_token_ = register_parameter("register_token", torch::zeros({1, 1, num_register_tokens, embed_dim}));
     }
-    aa_block_num_ = depth_ / aa_block_size_;
 
-    // Build patch embed
-    buildPatchEmbed(patch_embed, img_size, patch_size, num_register_tokens,
-                    true, 0.0, 0, 1.0, embed_dim);
+    // Alternating attention configuration
+    // AA_ORDER = ("frame", "global") in the Python code
+    aa_order_ = {"frame", "global"};
+    aa_block_size_ = 1;  // Number of blocks per attention type
+    aa_block_num_ = depth / aa_block_size_;  // 24 / 1 = 24 (matching Python: depth // aa_block_size)
 
-    // Initialize rotary position embedding if frequency > 0
-    if (rope_freq > 0) {
-        rope_ = layers::RotaryPositionEmbedding2D(rope_freq);
-        register_module("rope", rope_);
-        position_getter_ = std::make_shared<layers::PositionGetter>();
-    }
+    // Initialize RoPE (optional)
+    // rope_ = torch::nn::AnyModule(rope::RoPE())  // If using RoPE
 
-    // Create frame blocks
+    // Create position getter (if not using RoPE)
+    position_getter_ = std::make_shared<layers::PositionGetter>();
+
+    // Create frame and global blocks
     for (int64_t i = 0; i < depth_; ++i) {
         torch::Tensor init_vals = {};
         if (init_values > 0) {
@@ -56,7 +74,8 @@ AggregatorImpl::AggregatorImpl(
             rope_module = torch::nn::AnyModule(rope_);
         }
 
-        auto block = layers::Block(
+        // Use shared_ptr to avoid copying issues
+        auto block = std::make_shared<layers::BlockImpl>(
             embed_dim,
             num_heads,
             mlp_ratio,
@@ -75,12 +94,10 @@ AggregatorImpl::AggregatorImpl(
             true,  // fused_attn
             rope_module
         );
-
         frame_blocks_.push_back(block);
-        register_module("frame_block_" + std::to_string(i), frame_blocks_.back().ptr());
+        register_module("frame_block_" + std::to_string(i), block);
     }
 
-    // Create global blocks
     for (int64_t i = 0; i < depth_; ++i) {
         torch::Tensor init_vals = {};
         if (init_values > 0) {
@@ -92,7 +109,8 @@ AggregatorImpl::AggregatorImpl(
             rope_module = torch::nn::AnyModule(rope_);
         }
 
-        auto block = layers::Block(
+        // Use shared_ptr to avoid copying issues
+        auto block = std::make_shared<layers::BlockImpl>(
             embed_dim,
             num_heads,
             mlp_ratio,
@@ -111,28 +129,13 @@ AggregatorImpl::AggregatorImpl(
             true,  // fused_attn
             rope_module
         );
-
         global_blocks_.push_back(block);
-        register_module("global_block_" + std::to_string(i), global_blocks_.back().ptr());
+        register_module("global_block_" + std::to_string(i), block);
     }
 
-    // Special tokens
-    camera_token_ = register_parameter("camera_token", torch::empty({1, 2, 1, embed_dim}));
-    torch::nn::init::normal_(camera_token_, 0.0, 1e-6);
-
-    register_token_ = register_parameter("register_token",
-        torch::empty({1, 2, num_register_tokens, embed_dim}));
-    torch::nn::init::normal_(register_token_, 0.0, 1e-6);
-
-    patch_start_idx_ = 1 + num_register_tokens;
-
-    // Normalization constants
-    auto mean_tensor = torch::tensor({0.485, 0.456, 0.406});
-    auto std_tensor = torch::tensor({0.229, 0.224, 0.225});
-    _resnet_mean = register_buffer("_resnet_mean",
-        mean_tensor.view({1, 1, 3, 1, 1}).clone());
-    _resnet_std = register_buffer("_resnet_std",
-        std_tensor.view({1, 1, 3, 1, 1}).clone());
+    // Initialize ResNet normalization constants
+    _resnet_mean = register_buffer("_resnet_mean", torch::tensor({0.485f, 0.456f, 0.406f}).view({1, 1, 3, 1, 1}));
+    _resnet_std = register_buffer("_resnet_std", torch::tensor({0.229f, 0.224f, 0.225f}).view({1, 1, 3, 1, 1}));
 }
 
 void AggregatorImpl::buildPatchEmbed(
@@ -146,28 +149,20 @@ void AggregatorImpl::buildPatchEmbed(
     double init_values,
     int64_t embed_dim
 ) {
-    if (patch_embed.find("conv") != std::string::npos) {
-        auto pe = layers::PatchEmbed(img_size, patch_size, 3, embed_dim,
-                                     torch::nn::AnyModule(), true);
-        patch_embed_ = torch::nn::AnyModule(pe);
-        register_module("patch_embed", patch_embed_.ptr());
-    } else {
-        // DINOv2 vision transformer models
-        torch::nn::AnyModule vit_model;
-        if (patch_embed.find("vitl14") != std::string::npos) {
-            vit_model = torch::nn::AnyModule(layers::vit_large(patch_size, num_register_tokens));
-        } else if (patch_embed.find("vitb14") != std::string::npos) {
-            vit_model = torch::nn::AnyModule(layers::vit_base(patch_size, num_register_tokens));
-        } else if (patch_embed.find("vits14") != std::string::npos) {
-            vit_model = torch::nn::AnyModule(layers::vit_small(patch_size, num_register_tokens));
-        } else if (patch_embed.find("vitg2") != std::string::npos) {
-            vit_model = torch::nn::AnyModule(layers::vit_giant2(patch_size, num_register_tokens));
-        } else {
-            throw std::runtime_error("Unknown patch_embed type: " + patch_embed);
-        }
-        patch_embed_ = vit_model;
-        register_module("patch_embed", patch_embed_.ptr());
-    }
+    // Always create a simple PatchEmbed (Conv2d)
+    // Note: DINOv2 vision transformer embedding is not fully implemented yet
+    auto pe = std::make_shared<layers::PatchEmbedImpl>(img_size, patch_size, 3, embed_dim,
+                                 torch::nn::AnyModule(), true);
+    register_module("patch_embed", pe);
+    // Store as AnyModule for forward compatibility
+    patch_embed_ = torch::nn::AnyModule(layers::PatchEmbed(pe));
+}
+
+torch::Tensor AggregatorImpl::sliceExpandAndFlatten(torch::Tensor token, int64_t B, int64_t S) {
+    // token: [1, 1, N, C] -> [B, S, N, C] -> [B*S, N, C]
+    int64_t N = token.size(2);
+    int64_t C = token.size(3);
+    return token.expand({B, S, N, C}).reshape({B * S, N, C});
 }
 
 std::pair<std::vector<torch::Tensor>, int64_t> AggregatorImpl::forward(torch::Tensor images) {
@@ -239,32 +234,24 @@ std::pair<std::vector<torch::Tensor>, int64_t> AggregatorImpl::forward(torch::Te
         }
 
         for (size_t i = 0; i < frame_intermediates.size(); ++i) {
-            auto concat_inter = torch::cat({frame_intermediates[i], global_intermediates[i]}, -1);
-            output_list.push_back(concat_inter);
+            // Clone tensors to avoid potential memory issues with views
+            auto frame_clone = frame_intermediates[i].clone();
+            auto global_clone = global_intermediates[i].clone();
+            auto concat_inter = torch::cat({frame_clone, global_clone}, -1);
+            output_list.emplace_back(std::move(concat_inter));
         }
     }
 
     return {output_list, patch_start_idx_};
 }
 
-std::tuple<torch::Tensor, int64_t, std::vector<torch::Tensor>>
-AggregatorImpl::processFrameAttention(
-    torch::Tensor tokens,
-    int64_t B, int64_t S, int64_t P, int64_t C,
-    int64_t frame_idx, torch::Tensor pos) {
-
-    if (tokens.size(0) != B * S || tokens.size(1) != P) {
-        tokens = tokens.view({B, S, P, C}).view({B * S, P, C});
-    }
-
-    if (pos.defined() && (pos.size(0) != B * S || pos.size(1) != P)) {
-        pos = pos.view({B, S, P, 2}).view({B * S, P, 2});
-    }
+std::tuple<torch::Tensor, int64_t, std::vector<torch::Tensor>> AggregatorImpl::processFrameAttention(
+    torch::Tensor tokens, int64_t B, int64_t S, int64_t P, int64_t C, int64_t start_idx, torch::Tensor pos) {
 
     std::vector<torch::Tensor> intermediates;
 
     for (int64_t i = 0; i < aa_block_size_; ++i) {
-        auto& block = frame_blocks_[frame_idx];
+        auto block = frame_blocks_[start_idx];
 
         if (pos.defined()) {
             tokens = block->forward(tokens, pos);
@@ -272,56 +259,41 @@ AggregatorImpl::processFrameAttention(
             tokens = block->forward(tokens, {});
         }
 
-        frame_idx++;
+        start_idx++;
         intermediates.push_back(tokens.view({B, S, P, C}));
     }
 
-    return {tokens, frame_idx, intermediates};
+    return {tokens, start_idx, intermediates};
 }
 
-std::tuple<torch::Tensor, int64_t, std::vector<torch::Tensor>>
-AggregatorImpl::processGlobalAttention(
-    torch::Tensor tokens,
-    int64_t B, int64_t S, int64_t P, int64_t C,
-    int64_t global_idx, torch::Tensor pos) {
+std::tuple<torch::Tensor, int64_t, std::vector<torch::Tensor>> AggregatorImpl::processGlobalAttention(
+    torch::Tensor tokens, int64_t B, int64_t S, int64_t P, int64_t C, int64_t start_idx, torch::Tensor pos) {
 
-    if (tokens.size(0) != B || tokens.size(1) != S * P) {
-        tokens = tokens.view({B, S, P, C}).view({B, S * P, C});
-    }
-
-    if (pos.defined() && (pos.size(0) != B || pos.size(1) != S * P)) {
-        pos = pos.view({B, S, P, 2}).view({B, S * P, 2});
-    }
+    // Reshape tokens for global attention: [B*S, P, C] -> [B, S*P, C]
+    tokens = tokens.view({B, S * P, C});
 
     std::vector<torch::Tensor> intermediates;
 
     for (int64_t i = 0; i < aa_block_size_; ++i) {
-        auto& block = global_blocks_[global_idx];
+        auto block = global_blocks_[start_idx];
 
         if (pos.defined()) {
-            tokens = block->forward(tokens, pos);
+            // For global attention, we need to handle position embeddings differently
+            // The pos tensor has shape [B*S, P, 2], we need to reshape it to [B, S*P, 2]
+            auto pos_reshaped = pos.view({B, S * P, pos.size(-1)});
+            tokens = block->forward(tokens, pos_reshaped);
         } else {
             tokens = block->forward(tokens, {});
         }
 
-        global_idx++;
+        start_idx++;
         intermediates.push_back(tokens.view({B, S, P, C}));
     }
 
-    return {tokens, global_idx, intermediates};
-}
+    // Reshape back to [B*S, P, C]
+    tokens = tokens.view({B * S, P, C});
 
-torch::Tensor sliceExpandAndFlatten(const torch::Tensor& token_tensor, int64_t B, int64_t S) {
-    auto query = token_tensor.index({0, torch::indexing::Slice(0, 1)})
-                      .expand({B, 1, token_tensor.size(2), token_tensor.size(3)});
-
-    auto others = token_tensor.index({0, torch::indexing::Slice(1, 2)})
-                       .expand({B, S - 1, token_tensor.size(2), token_tensor.size(3)});
-
-    auto combined = torch::cat({query, others}, 1);
-    combined = combined.view({B * S, token_tensor.size(2), token_tensor.size(3)});
-
-    return combined;
+    return {tokens, start_idx, intermediates};
 }
 
 } // namespace models

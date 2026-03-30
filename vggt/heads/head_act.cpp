@@ -42,34 +42,62 @@ std::tuple<torch::Tensor, torch::Tensor> activate_head(
     const std::string& activation,
     const std::string& conf_activation) {
     auto fmap = out.permute({0, 2, 3, 1});
-    auto xyz = fmap.slice(-1, 0, -1);
-    auto conf = fmap.slice(-1, -1);
+
+    // Get dimensions
+    int64_t last_dim = fmap.size(-1);
 
     torch::Tensor pts3d;
-    if (activation == "norm_exp") {
-        auto d = xyz.norm(-1, true).clamp_min(1e-8);
-        auto xyz_normed = xyz / d;
-        pts3d = xyz_normed * torch::expm1(d);
-    } else if (activation == "norm") {
-        pts3d = xyz / xyz.norm(-1, true);
-    } else if (activation == "exp") {
-        pts3d = torch::exp(xyz);
-    } else if (activation == "relu") {
-        pts3d = torch::nn::functional::relu(xyz);
-    } else if (activation == "inv_log") {
-        pts3d = inverse_log_transform(xyz);
-    } else if (activation == "xy_inv_log") {
-        auto split = xyz.split({2, 1}, -1);
-        auto xy = split[0];
-        auto z = split[1];
-        z = inverse_log_transform(z);
-        pts3d = torch::cat({xy * z, z}, -1);
-    } else if (activation == "sigmoid") {
-        pts3d = torch::sigmoid(xyz);
-    } else if (activation == "linear") {
-        pts3d = xyz;
+    torch::Tensor conf;
+
+    if (last_dim == 1) {
+        // Special case: only 1 channel (e.g., depth prediction)
+        // The single channel is the prediction, create a dummy confidence
+        pts3d = fmap;
+        if (activation == "exp") {
+            pts3d = torch::exp(pts3d);
+        } else if (activation == "relu") {
+            pts3d = torch::nn::functional::relu(pts3d);
+        } else if (activation == "inv_log") {
+            pts3d = inverse_log_transform(pts3d);
+        } else if (activation == "sigmoid") {
+            pts3d = torch::sigmoid(pts3d);
+        } else if (activation == "linear") {
+            // pts3d = pts3d; // no-op
+        } else {
+            throw std::runtime_error("Activation '" + activation + "' not supported for single-channel output");
+        }
+        // Create dummy confidence (all ones)
+        conf = torch::ones_like(pts3d.slice(-1, 0, 1));
     } else {
-        throw std::runtime_error("Unknown activation: " + activation);
+        // Normal case: last channel is confidence, rest is xyz
+        auto xyz = fmap.slice(-1, 0, -1);
+        conf = fmap.slice(-1, -1);
+
+        if (activation == "norm_exp") {
+            auto d = xyz.norm(-1, true).clamp_min(1e-8);
+            auto xyz_normed = xyz / d;
+            pts3d = xyz_normed * torch::expm1(d);
+        } else if (activation == "norm") {
+            pts3d = xyz / xyz.norm(-1, true);
+        } else if (activation == "exp") {
+            pts3d = torch::exp(xyz);
+        } else if (activation == "relu") {
+            pts3d = torch::nn::functional::relu(xyz);
+        } else if (activation == "inv_log") {
+            pts3d = inverse_log_transform(xyz);
+        } else if (activation == "xy_inv_log") {
+            auto split = xyz.split({2, 1}, -1);
+            auto xy = split[0];
+            auto z = split[1];
+            z = inverse_log_transform(z);
+            pts3d = torch::cat({xy * z, z}, -1);
+        } else if (activation == "sigmoid") {
+            pts3d = torch::sigmoid(xyz);
+        } else if (activation == "linear") {
+            pts3d = xyz;
+        } else {
+            throw std::runtime_error("Unknown activation: " + activation);
+        }
     }
 
     torch::Tensor conf_out;

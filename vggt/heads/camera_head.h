@@ -32,12 +32,12 @@ private:
     int64_t trunk_depth;
 
     utils::StackSequential trunk;
-    torch::nn::LayerNorm token_norm;
-    torch::nn::LayerNorm trunk_norm;
+    torch::nn::LayerNorm token_norm{nullptr};
+    torch::nn::LayerNorm trunk_norm{nullptr};
     torch::Tensor empty_pose_tokens;
-    torch::nn::Linear embed_pose;
+    torch::nn::Linear embed_pose{nullptr};
     utils::StackSequential poseLN_modulation;
-    torch::nn::LayerNorm adaln_norm;
+    torch::nn::LayerNorm adaln_norm{nullptr};
     torch::nn::AnyModule pose_branch;
 };
 

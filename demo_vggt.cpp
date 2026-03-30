@@ -46,6 +46,8 @@ bool init_model(const std::string& weight_path = "", const std::string& device_s
         14,     // patch_size
         1024    // embed_dim
     );
+    
+    // Move model to device
     g_model->to(device);
     g_model->eval();
     
@@ -91,11 +93,23 @@ std::unordered_map<std::string, torch::Tensor> run_inference(
     
     // Load and preprocess images
     std::cout << "Loading and preprocessing images..." << std::endl;
-    auto [images_tensor, coords_tensor] = vggt::utils::load_and_preprocess_images_square(
-        image_paths, 518);
     
-    // Move to device
-    images_tensor = images_tensor.to(device);
+    // Use NoGradGuard during preprocessing to avoid gradient issues
+    torch::Tensor images_tensor;
+    torch::Tensor coords_tensor;
+    {
+        torch::NoGradGuard no_grad_pre;
+        auto result = vggt::utils::load_and_preprocess_images_square(image_paths, 518);
+        images_tensor = std::get<0>(result);
+        coords_tensor = std::get<1>(result);
+        
+        // Explicitly set requires_grad to false
+        images_tensor.set_requires_grad(false);
+        coords_tensor.set_requires_grad(false);
+        
+        // Move to device while still in no_grad context
+        images_tensor = images_tensor.to(device);
+    }
     
     std::cout << "Input shape: " << images_tensor.sizes() << std::endl;
     

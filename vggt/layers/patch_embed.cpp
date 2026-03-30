@@ -9,7 +9,7 @@ PatchEmbedImpl::PatchEmbedImpl(
     int64_t embed_dim,
     torch::nn::AnyModule norm_layer,
     bool flatten_embedding
-) : norm_(std::move(norm_layer)) {
+) : use_norm_(!norm_layer.is_empty()) {
     img_size_ = make_2tuple(img_size);
     patch_size_ = make_2tuple(patch_size);
     patches_resolution_ = std::make_tuple(
@@ -25,8 +25,9 @@ PatchEmbedImpl::PatchEmbedImpl(
     proj_ = register_module("proj", torch::nn::Conv2d(
         torch::nn::Conv2dOptions(in_chans, embed_dim, {std::get<0>(patch_size_), std::get<1>(patch_size_)}).stride({std::get<0>(patch_size_), std::get<1>(patch_size_)})
     ));
-    if (norm_.ptr()) {
-        register_module("norm", norm_.ptr());
+    
+    if (use_norm_) {
+        norm_ = register_module("norm", torch::nn::LayerNorm(torch::nn::LayerNormOptions({embed_dim})));
     }
 }
 
@@ -44,7 +45,9 @@ torch::Tensor PatchEmbedImpl::forward(torch::Tensor x) {
     H = x.size(2);
     W = x.size(3);
     x = x.flatten(2).transpose(1, 2); // B HW C
-    x = norm_.forward(x);
+    if (use_norm_) {
+        x = norm_->forward(x);
+    }
     if (!flatten_embedding_) {
         x = x.reshape(torch::IntArrayRef({-1, H, W, embed_dim_})); // B H W C
     }

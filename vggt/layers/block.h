@@ -2,10 +2,20 @@
 
 #include <torch/torch.h>
 #include <vector>
+#include <memory>
+
+#include "attention.h"
+#include "mlp.h"
+#include "layer_scale.h"
+#include "drop_path.h"
 
 namespace vggt {
 namespace layers {
 
+/**
+ * A standard transformer block with support for various attention mechanisms,
+ * layer scaling, and stochastic depth.
+ */
 class BlockImpl : public torch::nn::Module {
 public:
     BlockImpl(
@@ -20,7 +30,7 @@ public:
         torch::Tensor init_values = {},
         double drop_path = 0.0,
         torch::nn::AnyModule act_layer = torch::nn::AnyModule(torch::nn::GELU()),
-        torch::nn::AnyModule norm_layer = torch::nn::AnyModule(torch::nn::LayerNorm(torch::nn::LayerNormOptions({}))),
+        torch::nn::AnyModule norm_layer = torch::nn::AnyModule(torch::nn::LayerNorm(torch::nn::LayerNormOptions({}))), 
         torch::nn::AnyModule attn_class = torch::nn::AnyModule(),
         torch::nn::AnyModule ffn_layer = torch::nn::AnyModule(),
         bool qk_norm = false,
@@ -29,21 +39,31 @@ public:
     );
 
     torch::Tensor forward(torch::Tensor x, torch::Tensor pos = {});
+    FORWARD_HAS_DEFAULT_ARGS({1, torch::nn::AnyValue(torch::Tensor())})
 
 protected:
-    torch::nn::AnyModule norm1;
-    torch::nn::AnyModule attn;
-    torch::nn::AnyModule ls1;
-    torch::nn::AnyModule drop_path1;
-    torch::nn::AnyModule norm2;
-    torch::nn::AnyModule mlp;
-    torch::nn::AnyModule ls2;
-    torch::nn::AnyModule drop_path2;
+    // Submodules - use TORCH_MODULE types for proper registration
+    torch::nn::LayerNorm norm1{nullptr};
+    Attention attn{nullptr};
+    LayerScale ls1{nullptr};
+    torch::nn::Identity drop_path1_identity{nullptr};
+    DropPath drop_path1_droppath{nullptr};
+    torch::nn::LayerNorm norm2{nullptr};
+    Mlp mlp{nullptr};
+    LayerScale ls2{nullptr};
+    torch::nn::Identity drop_path2_identity{nullptr};
+    DropPath drop_path2_droppath{nullptr};
+    
     double sample_drop_ratio;
+    bool use_drop_path1;
+    bool use_drop_path2;
+    bool use_ls1;
+    bool use_ls2;
 };
 
 TORCH_MODULE(Block);
 
+// Helper functions for residual connections with stochastic depth
 torch::Tensor drop_add_residual_stochastic_depth(
     torch::Tensor x, 
     std::function<torch::Tensor(torch::Tensor, torch::Tensor)> residual_func, 
@@ -61,6 +81,7 @@ torch::Tensor add_residual(
     torch::Tensor scaling_vector = {}
 );
 
+// Nested tensor version for efficient batch processing
 class NestedTensorBlockImpl : public BlockImpl {
 public:
     using BlockImpl::BlockImpl;

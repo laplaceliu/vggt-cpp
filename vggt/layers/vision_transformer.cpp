@@ -24,7 +24,8 @@ void trunc_normal_tensor_(torch::Tensor tensor, double std = 0.02) {
         v = v / std::sqrt(1.0 + v * v);
         v = v * std::sqrt(2.0 / M_PI);
     }
-    tensor.copy_(torch::tensor(w, tensor.options()).view(size));
+    // Use .data() to bypass gradient tracking during initialization
+    tensor.data().copy_(torch::tensor(w, tensor.options()).view(size));
 }
 
 void init_weights_vit_timm(torch::nn::Module& module, const std::string& name = "") {
@@ -294,7 +295,7 @@ std::vector<torch::Tensor> DinoVisionTransformerImpl::forward_features_list(
 
     for (auto& block : blocks_) {
         // Same as above - normal forward pass
-        x[0] = block.forward(x[0]);
+        x[0] = block.forward<torch::Tensor>(x[0]);
     }
 
     std::vector<torch::Tensor> output;
@@ -310,12 +311,7 @@ torch::Tensor DinoVisionTransformerImpl::forward_features(
     x = prepare_tokens_with_masks(x, masks);
 
     for (auto& block : blocks_) {
-        // Gradient checkpointing for memory-efficient training:
-        // When use_reentrant_ is true and in training mode, we would use checkpoint.
-        // However, torch::autograd::checkpoint is not available in all libtorch versions.
-        // For now, we use normal forward pass which will consume more memory but is correct.
-        // TODO: Implement memory-efficient gradient checkpointing if needed for training
-        x = block.forward(x);
+        x = block.forward<torch::Tensor>(x);
     }
 
     return norm_->forward(x);
@@ -335,7 +331,7 @@ std::vector<torch::Tensor> DinoVisionTransformerImpl::get_intermediate_layers(
     bool return_class_token,
     bool norm
 ) {
-    x = prepare_tokens_with_masks(x);
+    x = prepare_tokens_with_masks(x, torch::Tensor());
 
     std::vector<torch::Tensor> outputs;
 
@@ -382,9 +378,9 @@ std::vector<torch::Tensor> DinoVisionTransformerImpl::get_intermediate_layers(
 }
 
 // Factory functions
-DinoVisionTransformer vit_small(int64_t patch_size, int64_t num_register_tokens) {
+DinoVisionTransformer vit_small(int64_t patch_size, int64_t num_register_tokens, int64_t img_size) {
     return DinoVisionTransformer(DinoVisionTransformerImpl(
-        224,                              // img_size
+        img_size,                          // img_size
         patch_size,                        // patch_size
         3,                                 // in_chans
         384,                               // embed_dim
@@ -409,9 +405,9 @@ DinoVisionTransformer vit_small(int64_t patch_size, int64_t num_register_tokens)
     ));
 }
 
-DinoVisionTransformer vit_base(int64_t patch_size, int64_t num_register_tokens) {
+DinoVisionTransformer vit_base(int64_t patch_size, int64_t num_register_tokens, int64_t img_size) {
     return DinoVisionTransformer(DinoVisionTransformerImpl(
-        224,                              // img_size
+        img_size,                          // img_size
         patch_size,                        // patch_size
         3,                                 // in_chans
         768,                               // embed_dim
@@ -436,9 +432,9 @@ DinoVisionTransformer vit_base(int64_t patch_size, int64_t num_register_tokens) 
     ));
 }
 
-DinoVisionTransformer vit_large(int64_t patch_size, int64_t num_register_tokens) {
+DinoVisionTransformer vit_large(int64_t patch_size, int64_t num_register_tokens, int64_t img_size) {
     return DinoVisionTransformer(DinoVisionTransformerImpl(
-        224,                              // img_size
+        img_size,                          // img_size
         patch_size,                       // patch_size
         3,                                // in_chans
         1024,                             // embed_dim
@@ -463,9 +459,9 @@ DinoVisionTransformer vit_large(int64_t patch_size, int64_t num_register_tokens)
     ));
 }
 
-DinoVisionTransformer vit_giant2(int64_t patch_size, int64_t num_register_tokens) {
+DinoVisionTransformer vit_giant2(int64_t patch_size, int64_t num_register_tokens, int64_t img_size) {
     return DinoVisionTransformer(DinoVisionTransformerImpl(
-        224,                              // img_size
+        img_size,                          // img_size
         patch_size,                       // patch_size
         3,                                // in_chans
         1536,                             // embed_dim

@@ -96,11 +96,13 @@ std::tuple<torch::Tensor, torch::Tensor> load_and_preprocess_images_square(
         // Convert to tensor using torch::from_blob
         // OpenCV stores images in HWC format, but PyTorch expects CHW
         // Also need to convert from uint8 [0-255] to float [0-1]
+        // Note: clone() ensures the tensor is not a view of the OpenCV data,
+        // which prevents potential in-place operation issues
         torch::Tensor img_tensor = torch::from_blob(
             resized_img.data, 
             {resized_img.rows, resized_img.cols, 3}, 
             torch::kByte
-        ).permute({2, 0, 1}).to(torch::kFloat32).div(255.0);
+        ).permute({2, 0, 1}).clone().to(torch::kFloat32).div(255.0);
         
         images.push_back(img_tensor);
     }

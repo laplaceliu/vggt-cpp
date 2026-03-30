@@ -5,6 +5,9 @@
 namespace vggt {
 namespace layers {
 
+// Forward declaration only
+class RotaryPositionEmbedding2DImpl;
+
 class AttentionImpl : public torch::nn::Module {
 public:
     AttentionImpl(
@@ -29,12 +32,15 @@ private:
     bool fused_attn;
 
     torch::nn::Linear qkv{nullptr};
-    torch::nn::AnyModule q_norm;
-    torch::nn::AnyModule k_norm;
+    torch::nn::LayerNorm q_norm{nullptr};
+    torch::nn::LayerNorm k_norm{nullptr};
+    torch::nn::Identity q_norm_identity{nullptr};
+    torch::nn::Identity k_norm_identity{nullptr};
     torch::nn::Dropout attn_drop{nullptr};
     torch::nn::Linear proj{nullptr};
     torch::nn::Dropout proj_drop{nullptr};
     torch::nn::AnyModule rope;
+    bool use_qk_norm;
 };
 TORCH_MODULE(Attention);
 

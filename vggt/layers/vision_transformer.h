@@ -39,16 +39,16 @@ public:
 
     torch::Tensor interpolate_pos_encoding(torch::Tensor x, int64_t w, int64_t h);
 
-    torch::Tensor prepare_tokens_with_masks(torch::Tensor x, torch::Tensor masks = {});
+    torch::Tensor prepare_tokens_with_masks(torch::Tensor x, torch::Tensor masks);
 
     std::vector<torch::Tensor> forward_features_list(
         std::vector<torch::Tensor> x_list,
         std::vector<torch::Tensor> masks_list
     );
 
-    torch::Tensor forward_features(torch::Tensor x, torch::Tensor masks = {});
+    torch::Tensor forward_features(torch::Tensor x, torch::Tensor masks);
 
-    torch::Tensor forward(torch::Tensor x, torch::Tensor masks = {});
+    torch::Tensor forward(torch::Tensor x, torch::Tensor masks);
 
     std::vector<torch::Tensor> get_intermediate_layers(
         torch::Tensor x,
@@ -95,22 +95,26 @@ TORCH_MODULE(DinoVisionTransformer);
 // Factory functions
 DinoVisionTransformer vit_small(
     int64_t patch_size = 16,
-    int64_t num_register_tokens = 0
+    int64_t num_register_tokens = 0,
+    int64_t img_size = 224
 );
 
 DinoVisionTransformer vit_base(
     int64_t patch_size = 16,
-    int64_t num_register_tokens = 0
+    int64_t num_register_tokens = 0,
+    int64_t img_size = 224
 );
 
 DinoVisionTransformer vit_large(
     int64_t patch_size = 16,
-    int64_t num_register_tokens = 0
+    int64_t num_register_tokens = 0,
+    int64_t img_size = 224
 );
 
 DinoVisionTransformer vit_giant2(
     int64_t patch_size = 16,
-    int64_t num_register_tokens = 0
+    int64_t num_register_tokens = 0,
+    int64_t img_size = 224
 );
 
 } // namespace layers

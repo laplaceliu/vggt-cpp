@@ -34,7 +34,8 @@ private:
     int64_t embed_dim_;
     bool flatten_embedding_;
     torch::nn::Conv2d proj_{nullptr};
-    torch::nn::AnyModule norm_;
+    torch::nn::LayerNorm norm_{nullptr};
+    bool use_norm_;
 };
 
 TORCH_MODULE(PatchEmbed);

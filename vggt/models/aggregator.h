@@ -22,19 +22,20 @@ public:
         int64_t img_size = 518,
         int64_t patch_size = 14,
         int64_t embed_dim = 1024,
-        int64_t depth = 24,
         int64_t num_heads = 16,
         double mlp_ratio = 4.0,
-        int64_t num_register_tokens = 4,
         bool qkv_bias = true,
         bool proj_bias = true,
         bool ffn_bias = true,
+        int64_t depth = 24,
+        double init_values = 0.01,
         const std::string& patch_embed = "dinov2_vitl14_reg",
-        const std::vector<std::string>& aa_order = {"frame", "global"},
-        int64_t aa_block_size = 1,
+        int64_t num_register_tokens = 4,
+        bool interpolate_antialias = true,
+        double interpolate_offset = 0.0,
+        int64_t block_chunks = 0,
         bool qk_norm = true,
-        double rope_freq = 100.0,
-        double init_values = 0.01
+        bool use_flex_attn = false
     );
 
     /**
@@ -78,8 +79,13 @@ private:
         torch::Tensor pos
     );
 
+    torch::Tensor sliceExpandAndFlatten(torch::Tensor token, int64_t B, int64_t S);
+
     // Configuration
+    int64_t img_size_;
+    int64_t embed_dim_;
     int64_t depth_;
+    int64_t num_register_tokens_;
     int64_t aa_block_size_;
     int64_t aa_block_num_;
     int64_t patch_size_;
@@ -94,9 +100,9 @@ private:
     layers::RotaryPositionEmbedding2D rope_{nullptr};
     std::shared_ptr<layers::PositionGetter> position_getter_;
 
-    // Attention blocks - stored as vector of Block modules
-    std::vector<layers::Block> frame_blocks_;
-    std::vector<layers::Block> global_blocks_;
+    // Attention blocks - stored as vector of shared_ptr to avoid copying issues
+    std::vector<std::shared_ptr<layers::BlockImpl>> frame_blocks_;
+    std::vector<std::shared_ptr<layers::BlockImpl>> global_blocks_;
 
     // Special tokens
     torch::Tensor camera_token_;
@@ -108,16 +114,6 @@ private:
 };
 
 TORCH_MODULE(Aggregator);
-
-/**
- * Processes specialized tokens with shape (1, 2, X, C) for multi-frame processing:
- * 1) Uses the first position (index=0) for the first frame only
- * 2) Uses the second position (index=1) for all remaining frames (S-1 frames)
- * 3) Expands both to match batch size B
- * 4) Concatenates to form (B, S, X, C)
- * 5) Flattens to (B*S, X, C) for processing
- */
-torch::Tensor sliceExpandAndFlatten(const torch::Tensor& token_tensor, int64_t B, int64_t S);
 
 } // namespace models
 } // namespace vggt

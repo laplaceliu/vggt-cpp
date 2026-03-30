@@ -13,37 +13,105 @@ std::unordered_map<std::string, torch::Tensor> WeightLoader::load_weights(
     std::unordered_map<std::string, torch::Tensor> state_dict;
     
     try {
-        // Read file into memory as bytes
-        std::ifstream file(weight_path, std::ios::binary | std::ios::ate);
-        if (!file.is_open()) {
+        // First check if this is a ZIP archive (safetensors format from Hugging Face)
+        std::ifstream file_check(weight_path, std::ios::binary);
+        if (!file_check.is_open()) {
             std::cerr << "Error: Could not open file: " << weight_path << std::endl;
             return {};
         }
         
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
+        // Read first 4 bytes to check for ZIP signature
+        char header[4];
+        file_check.read(header, 4);
+        file_check.close();
         
-        std::vector<char> data(size);
-        if (!file.read(data.data(), size)) {
-            std::cerr << "Error: Could not read file: " << weight_path << std::endl;
-            return {};
-        }
+        bool is_zip = (header[0] == 'P' && header[1] == 'K' && header[2] == '\x03' && header[3] == '\x04');
         
-        // Load using torch::pickle_load
-        torch::IValue ivalue = torch::pickle_load(data);
-        
-        if (ivalue.isGenericDict()) {
-            auto dict = ivalue.toGenericDict();
-            for (auto& item : dict) {
-                std::string key = item.key().toStringRef();
-                if (item.value().isTensor()) {
-                    state_dict[key] = item.value().toTensor();
-                }
+        if (is_zip) {
+            // This is a ZIP archive - use torch::serialize::InputArchive
+            std::cerr << "Detected ZIP archive format, using torch::serialize::InputArchive" << std::endl;
+            
+            // Try to load using InputArchive which handles ZIP format
+            torch::serialize::InputArchive archive;
+            archive.load_from(weight_path);
+            
+            // Read all tensors from the archive
+            std::vector<torch::Tensor> tensors;
+            torch::load(tensors, weight_path);
+            
+            // The ZIP format stores tensors with keys, need different approach
+            // For Hugging Face format, use torch::jit::load which handles this
+            // But since jit::load may not be available, we need another approach
+            
+            // Try using the zipfile Python module to extract, then load the pickle
+            // Since we can't do that easily in C++, let's try loading as a regular torch file
+            std::cerr << "Warning: ZIP format requires extraction. Trying direct load..." << std::endl;
+            
+            // Fallback: try loading as a pickled file directly
+            std::ifstream file(weight_path, std::ios::binary | std::ios::ate);
+            if (!file.is_open()) {
+                std::cerr << "Error: Could not open file: " << weight_path << std::endl;
+                return {};
             }
-        } else if (ivalue.isTensor()) {
-            state_dict["model"] = ivalue.toTensor();
+            
+            std::streamsize size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            
+            std::vector<char> data(size);
+            if (!file.read(data.data(), size)) {
+                std::cerr << "Error: Could not read file: " << weight_path << std::endl;
+                return {};
+            }
+            
+            // Try loading using pickle_load
+            torch::IValue ivalue = torch::pickle_load(data);
+            
+            if (ivalue.isGenericDict()) {
+                auto dict = ivalue.toGenericDict();
+                for (auto& item : dict) {
+                    std::string key = item.key().toStringRef();
+                    if (item.value().isTensor()) {
+                        state_dict[key] = item.value().toTensor();
+                    }
+                }
+            } else if (ivalue.isTensor()) {
+                state_dict["model"] = ivalue.toTensor();
+            } else {
+                std::cerr << "Warning: Unexpected checkpoint format" << std::endl;
+            }
         } else {
-            std::cerr << "Warning: Unexpected checkpoint format in " << weight_path << std::endl;
+            // Standard pickle format - use pickle_load
+            std::ifstream file(weight_path, std::ios::binary | std::ios::ate);
+            if (!file.is_open()) {
+                std::cerr << "Error: Could not open file: " << weight_path << std::endl;
+                return {};
+            }
+            
+            std::streamsize size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            
+            std::vector<char> data(size);
+            if (!file.read(data.data(), size)) {
+                std::cerr << "Error: Could not read file: " << weight_path << std::endl;
+                return {};
+            }
+            
+            // Load using torch::pickle_load
+            torch::IValue ivalue = torch::pickle_load(data);
+            
+            if (ivalue.isGenericDict()) {
+                auto dict = ivalue.toGenericDict();
+                for (auto& item : dict) {
+                    std::string key = item.key().toStringRef();
+                    if (item.value().isTensor()) {
+                        state_dict[key] = item.value().toTensor();
+                    }
+                }
+            } else if (ivalue.isTensor()) {
+                state_dict["model"] = ivalue.toTensor();
+            } else {
+                std::cerr << "Warning: Unexpected checkpoint format in " << weight_path << std::endl;
+            }
         }
         
     } catch (const c10::Error& e) {
