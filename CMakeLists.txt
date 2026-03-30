@@ -9,6 +9,7 @@ set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "-fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEINOPS_TORCH_BACKEND")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
@@ -63,4 +64,5 @@ target_link_libraries(demo_vggt
     vggt
     pthread
     ${TORCH_LIBRARIES}
+    -Wl,--allow-multiple-definition
 )

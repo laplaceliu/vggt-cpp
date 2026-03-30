@@ -293,9 +293,7 @@ std::vector<torch::Tensor> DinoVisionTransformerImpl::forward_features_list(
     }
 
     for (auto& block : blocks_) {
-        if (is_training()) {
-            throw std::runtime_error("Gradient checkpointing not implemented in C++");
-        }
+        // Same as above - normal forward pass
         x[0] = block.forward(x[0]);
     }
 
@@ -312,9 +310,11 @@ torch::Tensor DinoVisionTransformerImpl::forward_features(
     x = prepare_tokens_with_masks(x, masks);
 
     for (auto& block : blocks_) {
-        if (is_training()) {
-            throw std::runtime_error("Gradient checkpointing not implemented in C++");
-        }
+        // Gradient checkpointing for memory-efficient training:
+        // When use_reentrant_ is true and in training mode, we would use checkpoint.
+        // However, torch::autograd::checkpoint is not available in all libtorch versions.
+        // For now, we use normal forward pass which will consume more memory but is correct.
+        // TODO: Implement memory-efficient gradient checkpointing if needed for training
         x = block.forward(x);
     }
 
