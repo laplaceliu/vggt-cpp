@@ -47,3 +47,4 @@ thirdparty
 ref
 CODEBUDDY.md
 .codebuddy
+weights/model.pt
