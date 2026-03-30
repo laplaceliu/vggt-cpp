@@ -6,7 +6,7 @@
 
 #include "aggregator.h"
 #include "../heads/camera_head.h"
-// #include "../heads/dpt_head.h"  // TODO: DPTHead not fully implemented yet
+#include "../heads/dpt_head.h"
 #include "../heads/track_head.h"
 
 namespace vggt {
@@ -54,9 +54,9 @@ private:
 
     // Prediction heads
     heads::CameraHead camera_head_{nullptr};
-    // TODO: heads::DPTHead point_head_{nullptr};  // For 3D world points
-    // TODO: heads::DPTHead depth_head_{nullptr};  // For depth
-    heads::TrackHead track_head_{nullptr}; // For point tracking
+    heads::DPTHead point_head_{nullptr};    // For 3D world points
+    heads::DPTHead depth_head_{nullptr};    // For depth
+    heads::TrackHead track_head_{nullptr};  // For point tracking
 };
 
 TORCH_MODULE(VGGT);

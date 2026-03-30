@@ -1,4 +1,5 @@
 #include "track_head.h"
+#include "dpt_head.h"
 
 namespace vggt {
 namespace heads {
@@ -15,6 +16,25 @@ TrackHeadImpl::TrackHeadImpl(
     int64_t hidden_size
 ) : patch_size_(patch_size),
     iters_(iters) {
+
+    // Feature extractor based on DPT architecture
+    // Processes tokens into feature maps for tracking
+    std::vector<int64_t> out_channels = {256, 512, 1024, 1024};
+    std::vector<int64_t> intermediate_layer_idx = {4, 11, 17, 23};
+    feature_extractor_ = DPTHead(
+        dim_in,
+        patch_size,
+        4,          // output_dim
+        "inv_log",  // activation
+        "expp1",    // conf_activation
+        features,   // features
+        out_channels,       // out_channels
+        intermediate_layer_idx,  // intermediate_layer_idx
+        false,      // pos_embed (disabled for tracking)
+        true,       // feature_only (only output features)
+        2           // down_ratio
+    );
+    register_module("feature_extractor", feature_extractor_);
 
     // Initialize tracker
     tracker_ = dependency::track_modules::BaseTrackerPredictor(
@@ -40,18 +60,14 @@ std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor> TrackHeadIm
     auto sizes = images.sizes();
     int64_t B = sizes[0];
     int64_t S = sizes[1];
-    int64_t H = sizes[3];
-    int64_t W = sizes[4];
 
-    // TODO: Extract features from tokens using DPTHead
-    // For now, we create placeholder feature maps
-    // In full implementation, this should call a DPTHead feature extractor
-    // feature_maps should have shape (B, S, features, H//2, W//2) due to down_ratio=2
-
-    // Placeholder: create random feature maps for now
-    // This should be replaced with actual DPT feature extraction
-    auto feature_maps = torch::randn({B, S, 128, H / 2, W / 2},
-        torch::TensorOptions().device(images.device()).dtype(images.dtype()));
+    // Extract features from tokens using DPTHead
+    // feature_maps has shape (B, S, C, H//2, W//2) due to down_ratio=2
+    torch::Tensor feature_maps;
+    {
+        auto result = feature_extractor_->forward(aggregated_tokens_list, images, patch_start_idx);
+        feature_maps = std::get<0>(result);
+    }
 
     // Use default iterations if not specified
     if (iters < 0) {

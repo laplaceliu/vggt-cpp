@@ -1,4 +1,5 @@
 #include "vggt.h"
+#include "../heads/dpt_head.h"
 
 namespace vggt {
 namespace models {
@@ -18,14 +19,39 @@ VGGTImpl::VGGTImpl(
 
     // Point head (for 3D world coordinates)
     // DPTHead with output_dim=4, activation="inv_log", conf_activation="expp1"
-    // Note: Full DPTHead implementation needed for complete functionality
-    // point_head_ = heads::DPTHead(2 * embed_dim, ...);
-    // register_module("point_head", point_head_);
+    std::vector<int64_t> out_channels = {256, 512, 1024, 1024};
+    std::vector<int64_t> intermediate_layer_idx = {4, 11, 17, 23};
+    point_head_ = heads::DPTHead(
+        2 * embed_dim,
+        patch_size,
+        4,                    // output_dim (xyz + confidence)
+        "inv_log",            // activation
+        "expp1",              // conf_activation
+        256,                  // features
+        out_channels,          // out_channels
+        intermediate_layer_idx, // intermediate_layer_idx
+        true,                  // pos_embed
+        false,                 // feature_only
+        1                      // down_ratio
+    );
+    register_module("point_head", point_head_);
 
     // Depth head
-    // DPTHead with output_dim=2, activation="exp", conf_activation="expp1"
-    // depth_head_ = heads::DPTHead(2 * embed_dim, ...);
-    // register_module("depth_head", depth_head_);
+    // DPTHead with output_dim=1, activation="exp", conf_activation="expp1"
+    depth_head_ = heads::DPTHead(
+        2 * embed_dim,
+        patch_size,
+        1,                    // output_dim (depth only)
+        "exp",                // activation
+        "expp1",              // conf_activation
+        256,                  // features
+        out_channels,          // out_channels
+        intermediate_layer_idx, // intermediate_layer_idx
+        true,                  // pos_embed
+        false,                 // feature_only
+        1                      // down_ratio
+    );
+    register_module("depth_head", depth_head_);
 
     // Track head
     track_head_ = heads::TrackHead(2 * embed_dim, patch_size);
@@ -57,18 +83,18 @@ std::unordered_map<std::string, torch::Tensor> VGGTImpl::forward(
     }
 
     // Depth head prediction
-    // if (!depth_head_.is_empty()) {
-    //     auto [depth, depth_conf] = depth_head_->forward(aggregated_tokens_list, images, patch_start_idx);
-    //     predictions["depth"] = depth;
-    //     predictions["depth_conf"] = depth_conf;
-    // }
+    if (!depth_head_.is_empty()) {
+        auto [depth, depth_conf] = depth_head_->forward(aggregated_tokens_list, images, patch_start_idx);
+        predictions["depth"] = depth;
+        predictions["depth_conf"] = depth_conf;
+    }
 
     // Point head prediction
-    // if (!point_head_.is_empty()) {
-    //     auto [pts3d, pts3d_conf] = point_head_->forward(aggregated_tokens_list, images, patch_start_idx);
-    //     predictions["world_points"] = pts3d;
-    //     predictions["world_points_conf"] = pts3d_conf;
-    // }
+    if (!point_head_.is_empty()) {
+        auto [pts3d, pts3d_conf] = point_head_->forward(aggregated_tokens_list, images, patch_start_idx);
+        predictions["world_points"] = pts3d;
+        predictions["world_points_conf"] = pts3d_conf;
+    }
 
     // Track head prediction
     if (!track_head_.is_empty() && query_points.defined()) {

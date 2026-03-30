@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../dependency/track_modules/base_track_predictor.h"
+#include "dpt_head.h"
 
 namespace vggt {
 namespace heads {
@@ -52,8 +53,7 @@ private:
     int64_t iters_;
 
     // Feature extractor (DPT-based)
-    // Note: DPTHead needs to be fully implemented for feature extraction
-    // For now, we use a placeholder that will be replaced when DPTHead is complete
+    DPTHead feature_extractor_{nullptr};
 
     // Tracker module
     dependency::track_modules::BaseTrackerPredictor tracker_{nullptr};
