@@ -105,15 +105,64 @@ The demo produces:
 
 ## Pretrained Weights
 
-Pretrained VGGT weights can be downloaded from:
-- [HuggingFace VGGT](https://huggingface.co/facebook/vggt)
-- [PyTorch VGGT](https://github.com/facebookresearch/vggt)
+### Download Using Script
 
-Example weight loading (Python):
+A convenient Python script is provided to download pretrained weights from Hugging Face:
+
+```bash
+# Install required dependency
+pip install huggingface_hub
+
+# Download weights to default directory (./weights)
+# Requires Hugging Face token for gated model access
+python download_weights.py --token hf_xxxxxxxxxxxxxxxxxxxx
+
+# Or use environment variable (recommended)
+export HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+python download_weights.py
+
+# Download to specific directory
+python download_weights.py --output /path/to/weights
+
+# Use with proxy (if needed)
+export ALL_PROXY=socks5h://host:port
+python download_weights.py --token hf_xxxxxxxxxxxxxxxxxxxx
+```
+
+**Getting Hugging Face Token:**
+1. Visit https://huggingface.co/settings/tokens
+2. Create a new access token
+3. Accept the model license at https://huggingface.co/facebook/VGGT-1B
+
+### Manual Download
+
+Pretrained VGGT weights can be manually downloaded from:
+- [HuggingFace VGGT-1B](https://huggingface.co/facebook/VGGT-1B)
+
+Place the downloaded `model.pt` file in your preferred directory and use it with the `-m` flag:
+
+```bash
+./demo_vggt -m /path/to/model.pt -i img1.jpg,img2.jpg
+```
+
+### Using Pretrained Weights
+
+**Python (Reference Implementation):**
 ```python
 from vggt.models.vggt import VGGT
-model = VGGT.from_pretrained("facebook/vggt")
+model = VGGT.from_pretrained("facebook/VGGT-1B")
 ```
+
+**C++ (This Implementation):**
+```bash
+# Download weights first
+python download_weights.py --token hf_xxx
+
+# Run inference with weights
+./demo_vggt -m ./weights/model.pt -i img1.jpg,img2.jpg
+```
+
+**Note:** Without pretrained weights, the model will use random initialization and produce meaningless results. Always use pretrained weights for actual inference.
 
 ## C++ API
 
