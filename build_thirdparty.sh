@@ -661,9 +661,140 @@ build_spdlog() {
     rm -rf $TMP_DIR
 }
 
+# Detect CUDA version and return the corresponding libtorch CUDA suffix
+get_libtorch_cuda_version() {
+    local cuda_version=""
+    
+    # Try to detect CUDA version from nvcc
+    if command -v nvcc &> /dev/null; then
+        cuda_version=$(nvcc --version | grep "release" | sed -n 's/.*release \([0-9]\+\.[0-9]\+\).*/\1/p')
+    fi
+    
+    # If nvcc not found, try to detect from /usr/local/cuda
+    if [ -z "$cuda_version" ] && [ -d "/usr/local/cuda" ]; then
+        if [ -f "/usr/local/cuda/version.txt" ]; then
+            cuda_version=$(cat /usr/local/cuda/version.txt | grep -oP '\d+\.\d+')
+        elif [ -f "/usr/local/cuda/version.json" ]; then
+            cuda_version=$(cat /usr/local/cuda/version.json | grep -oP '"version"\s*:\s*"\K\d+\.\d+')
+        fi
+    fi
+    
+    # Map CUDA version to libtorch CUDA suffix
+    case "$cuda_version" in
+        12.8|12.8.*)
+            echo "cu128"
+            ;;
+        12.6|12.6.*)
+            echo "cu126"
+            ;;
+        12.4|12.4.*)
+            echo "cu124"
+            ;;
+        12.1|12.1.*)
+            echo "cu121"
+            ;;
+        11.8|11.8.*)
+            echo "cu118"
+            ;;
+        "")
+            echo "cpu"
+            ;;
+        *)
+            echo "cu121"
+            ;;
+    esac
+}
+
+build_libtorch() {
+    local LIBTORCH_VERSION="2.11.0"
+    local CUDA_SUFFIX=$(get_libtorch_cuda_version)
+    local LIBTORCH_NAME="libtorch-shared-with-deps-${LIBTORCH_VERSION}+${CUDA_SUFFIX}"
+    local SOURCE="${LIBTORCH_NAME}.zip"
+    local TMP_DIR=$(mktemp -d)
+    
+    echo "Detected CUDA version suffix: $CUDA_SUFFIX"
+    echo "Looking for libtorch: $SOURCE"
+    
+    # Check if zip file exists in thirdparty directory
+    if [ -f "$THIRDPARTY_SOURCE_DIR/$SOURCE" ]; then
+        echo "Found $SOURCE in thirdparty directory, using local file"
+    else
+        echo "$SOURCE not found in thirdparty directory"
+        
+        # Check if any libtorch zip exists in thirdparty
+        local existing_libtorch=$(find "$THIRDPARTY_SOURCE_DIR" -maxdepth 1 -name "libtorch-*.zip" -type f | head -1)
+        if [ -n "$existing_libtorch" ]; then
+            SOURCE=$(basename "$existing_libtorch")
+            echo "Found existing libtorch zip: $SOURCE, using it instead"
+        else
+            # Download from pytorch.org
+            local URL="https://download.pytorch.org/libtorch/${CUDA_SUFFIX}/${SOURCE}"
+            echo "Downloading libtorch from $URL..."
+            
+            if command -v wget &> /dev/null; then
+                wget --progress=bar:force -O "$THIRDPARTY_SOURCE_DIR/$SOURCE" "$URL"
+            elif command -v curl &> /dev/null; then
+                curl -L --progress-bar -o "$THIRDPARTY_SOURCE_DIR/$SOURCE" "$URL"
+            else
+                echo "Error: Neither wget nor curl is available"
+                rm -rf $TMP_DIR
+                return 1
+            fi
+            
+            if [ $? -ne 0 ]; then
+                echo "Failed to download libtorch"
+                rm -rf $TMP_DIR
+                return 1
+            fi
+            echo "Downloaded libtorch successfully"
+        fi
+    fi
+    
+    # Extract libtorch to dependencies
+    echo "Extracting libtorch to $DEPENDENCIES_INSTALL_DIR..."
+    unzip -q -o "$THIRDPARTY_SOURCE_DIR/$SOURCE" -d "$DEPENDENCIES_INSTALL_DIR"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to extract libtorch"
+        rm -rf $TMP_DIR
+        return 1
+    fi
+    
+    # Move libtorch contents to dependencies root
+    if [ -d "$DEPENDENCIES_INSTALL_DIR/libtorch" ]; then
+        # Move include files
+        if [ -d "$DEPENDENCIES_INSTALL_DIR/libtorch/include" ]; then
+            mkdir -p "$DEPENDENCIES_INSTALL_DIR/include"
+            cp -r "$DEPENDENCIES_INSTALL_DIR/libtorch/include/"* "$DEPENDENCIES_INSTALL_DIR/include/"
+        fi
+        
+        # Move lib files
+        if [ -d "$DEPENDENCIES_INSTALL_DIR/libtorch/lib" ]; then
+            mkdir -p "$DEPENDENCIES_INSTALL_DIR/lib"
+            cp -r "$DEPENDENCIES_INSTALL_DIR/libtorch/lib/"* "$DEPENDENCIES_INSTALL_DIR/lib/"
+        fi
+        
+        # Move share files
+        if [ -d "$DEPENDENCIES_INSTALL_DIR/libtorch/share" ]; then
+            mkdir -p "$DEPENDENCIES_INSTALL_DIR/share"
+            cp -r "$DEPENDENCIES_INSTALL_DIR/libtorch/share/"* "$DEPENDENCIES_INSTALL_DIR/share/"
+        fi
+        
+        # Clean up extracted libtorch directory
+        rm -rf "$DEPENDENCIES_INSTALL_DIR/libtorch"
+    fi
+    
+    echo "libtorch installed successfully to $DEPENDENCIES_INSTALL_DIR"
+    
+    rm -rf $TMP_DIR
+}
+
 default() {
+    build_libtorch
+    build_boost
     build_eigen_master
     build_colmap
+    build_matplot
     build_gtest
     build_eigen
     build_opencv
@@ -714,6 +845,8 @@ else
             build_opencv
         elif [ $param = "spdlog" ]; then
             build_spdlog
+        elif [ $param = "libtorch" ]; then
+            build_libtorch
         else
             echo "unknown param: $param"
         fi
