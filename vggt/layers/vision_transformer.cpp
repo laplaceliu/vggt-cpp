@@ -357,12 +357,14 @@ std::vector<torch::Tensor> DinoVisionTransformerImpl::get_intermediate_layers(
 
     if (reshape) {
         int64_t B = x.size(0);
-        int64_t w = x.size(1) / patch_size_;
-        int64_t h = x.size(2) / patch_size_;
+        // Calculate grid size from num_patches_ (e.g., 196 = 14x14 for 224x224 image with patch_size=16)
+        int64_t grid_size = static_cast<int64_t>(std::sqrt(num_patches_));
+        int64_t w = grid_size;
+        int64_t h = grid_size;
         std::vector<torch::Tensor> reshaped_outputs;
         for (auto& out : outputs) {
             auto reshaped = out.index({torch::indexing::Slice(), torch::indexing::Slice(1 + num_register_tokens_, torch::indexing::None), torch::indexing::Slice()})
-                .reshape({B, w, h, -1})
+                .reshape({B, h, w, -1})
                 .permute({0, 3, 1, 2})
                 .contiguous();
             reshaped_outputs.push_back(reshaped);

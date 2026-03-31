@@ -362,6 +362,21 @@ target_link_libraries(test_block
 )
 add_test(NAME block_test COMMAND test_block)
 
+# Vision Transformer Test
+add_executable(test_vision_transformer
+    tests/test_vision_transformer.cpp
+)
+target_link_libraries(test_vision_transformer
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME vision_transformer_test COMMAND test_vision_transformer)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
