@@ -179,5 +179,50 @@ target_link_libraries(test_rope
 )
 add_test(NAME rope_test COMMAND test_rope)
 
-# Block Test - SKIPPED: Block/NestedTensorBlock have design issues with 
+# Block Test - SKIPPED: Block/NestedTensorBlock have design issues with
 # libtorch ModuleHolder (no default constructor, constructor forwarding issues)
+
+# Geometry Test
+add_executable(test_geometry
+    tests/test_geometry.cpp
+)
+target_link_libraries(test_geometry
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME geometry_test COMMAND test_geometry)
+
+# Distortion Test
+add_executable(test_distortion
+    tests/test_distortion.cpp
+)
+target_link_libraries(test_distortion
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME distortion_test COMMAND test_distortion)
+
+# Projection Test
+add_executable(test_projection
+    tests/test_projection.cpp
+)
+target_link_libraries(test_projection
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME projection_test COMMAND test_projection)
