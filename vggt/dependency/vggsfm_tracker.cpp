@@ -18,16 +18,18 @@ TrackerPredictorImpl::TrackerPredictorImpl() {
     coarse_predictor = register_module("coarse_predictor", track_modules::BaseTrackerPredictor(coarse_stride));
 
     // Create fine predictor with stride = 1
-    fine_fnet = register_module("fine_fnet", track_modules::ShallowEncoder(1));
+    // ShallowEncoder(input_dim=3 for RGB images)
+    fine_fnet = register_module("fine_fnet", track_modules::ShallowEncoder(3));
+    // BaseTrackerPredictor(stride, corr_levels, corr_radius, latent_dim, hidden_size, use_spaceatt, depth, fine)
     fine_predictor = register_module("fine_predictor", track_modules::BaseTrackerPredictor(
-        1, // stride
-        4, // depth
-        3, // corr_levels
-        3, // corr_radius
-        32, // latent_dim
-        256, // hidden_size
-        true, // fine
-        false // use_spaceatt
+        1,    // stride
+        3,    // corr_levels
+        3,    // corr_radius
+        32,   // latent_dim
+        256,  // hidden_size
+        false, // use_spaceatt
+        4,    // depth
+        true  // fine
     ));
 }
 

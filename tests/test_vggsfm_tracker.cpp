@@ -76,7 +76,8 @@ TEST(VggsfmTrackerTest, ForwardBasic) {
 }
 
 TEST(VggsfmTrackerTest, ForwardWithFineTracking) {
-    GTEST_SKIP() << "Skipped: refine_track has unfold dimension issues that need to be fixed separately";
+    // Skipped: refine_track requires specific image/coordinate sizes to avoid unfold dimension issues
+    GTEST_SKIP() << "Skipped: refine_track requires coordinate range adjustments for fine tracking";
 }
 
 TEST(VggsfmTrackerTest, ForwardWithPrecomputedFmaps) {

@@ -109,15 +109,27 @@ std::tuple<torch::Tensor, torch::Tensor> refine_track(
     patch_query_points = patch_query_points.reshape({B * N, 2}).unsqueeze(1);
 
     // Feed the PATCH query points and tracks into fine tracker
-    auto result = fine_tracker.forward<std::tuple<std::vector<torch::Tensor>, torch::Tensor>>(patch_query_points, patch_feat, fine_iters, true);
+    // BaseTrackerPredictor::forward returns a variant, so we need to handle it properly
+    using ReturnVariant = std::variant<
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor>,
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>
+    >;
+    // forward args: query_points, fmaps, iters, return_feat, down_ratio
+    auto variant_result = fine_tracker.forward<ReturnVariant>(
+        patch_query_points, patch_feat, 
+        static_cast<int64_t>(fine_iters), 
+        static_cast<bool>(true), 
+        static_cast<int64_t>(1)
+    );
+
+    // Extract the 4-element tuple from the variant (fine mode returns 4 elements)
+    auto result = std::get<std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>>(variant_result);
 
     std::vector<torch::Tensor> fine_pred_track_lists;
     torch::Tensor vis_e, track_feats, query_point_feat;
 
-    // Extract the results from the tuple
-    std::tie(fine_pred_track_lists, vis_e) = result;
-    // Note: In the Python version, there might be additional elements in the tuple
-    // that we're not using in this C++ implementation
+    // Extract all 4 elements from the tuple
+    std::tie(fine_pred_track_lists, vis_e, track_feats, query_point_feat) = result;
 
     // relative the patch top left
     auto fine_pred_track = fine_pred_track_lists.back().clone();
@@ -237,15 +249,27 @@ std::tuple<torch::Tensor, torch::Tensor> refine_track_v0(
     patch_query_points = patch_query_points.reshape({B * N, 2}).unsqueeze(1);
 
     // Feed the PATCH query points and tracks into fine tracker
-    auto result = fine_tracker.forward<std::tuple<std::vector<torch::Tensor>, torch::Tensor>>(patch_query_points, patch_feat, fine_iters, true);
+    // BaseTrackerPredictor::forward returns a variant
+    using ReturnVariant = std::variant<
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor>,
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>
+    >;
+    // forward args: query_points, fmaps, iters, return_feat, down_ratio
+    auto variant_result = fine_tracker.forward<ReturnVariant>(
+        patch_query_points, patch_feat, 
+        static_cast<int64_t>(fine_iters), 
+        static_cast<bool>(true), 
+        static_cast<int64_t>(1)
+    );
+
+    // Extract the 4-element tuple from the variant
+    auto result = std::get<std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>>(variant_result);
 
     std::vector<torch::Tensor> fine_pred_track_lists;
     torch::Tensor vis_e, track_feats, query_point_feat;
 
-    // Extract the results from the tuple
-    std::tie(fine_pred_track_lists, vis_e) = result;
-    // Note: In the Python version, there might be additional elements in the tuple
-    // that we're not using in this C++ implementation
+    // Extract all 4 elements from the tuple
+    std::tie(fine_pred_track_lists, vis_e, track_feats, query_point_feat) = result;
 
     // relative the patch top left
     auto fine_pred_track = fine_pred_track_lists.back().clone();
