@@ -81,7 +81,18 @@ TEST(MakeScratchTest, ThreeInputChannels) {
 }
 
 TEST(MakeScratchTest, ScratchRegisteredModules) {
-    GTEST_SKIP() << "Skipped: named_modules() has libtorch API issues with top-level module";
+    std::vector<int64_t> in_shape = {256, 512, 1024, 1024};
+    auto scratch = _make_scratch(in_shape, 256, 1, false);
+    
+    // Use children() instead of named_modules() to avoid libtorch API issues
+    // children() returns immediate submodules
+    std::vector<std::string> module_names;
+    for (const auto& child : scratch.children()) {
+        module_names.push_back(child->name());
+    }
+    
+    // Should have 4 submodules (layer1_rn, layer2_rn, layer3_rn, layer4_rn)
+    EXPECT_EQ(module_names.size(), 4);
 }
 
 // ==================== _make_fusion_block Tests ====================
@@ -92,7 +103,16 @@ TEST(MakeFusionBlockTest, BasicConstruction) {
 }
 
 TEST(MakeFusionBlockTest, HasResidualConvUnit) {
-    GTEST_SKIP() << "Skipped: named_modules() has libtorch API issues with top-level module";
+    auto fusion_block = _make_fusion_block(256, c10::nullopt, true, 1);
+    
+    // Use children() instead of named_modules() to avoid libtorch API issues
+    std::vector<std::string> module_names;
+    for (const auto& child : fusion_block.children()) {
+        module_names.push_back(child->name());
+    }
+    
+    // Should have 1 submodule (resConfUnit)
+    EXPECT_EQ(module_names.size(), 1);
 }
 
 TEST(MakeFusionBlockTest, WithoutResidual) {
