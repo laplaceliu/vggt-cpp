@@ -481,3 +481,33 @@ target_link_libraries(test_helper
     -Wl,--allow-multiple-definition
 )
 add_test(NAME helper_test COMMAND test_helper)
+
+# Aggregator Test
+add_executable(test_aggregator
+    tests/test_aggregator.cpp
+)
+target_link_libraries(test_aggregator
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME aggregator_test COMMAND test_aggregator)
+
+# VGGT Test
+add_executable(test_vggt
+    tests/test_vggt.cpp
+)
+target_link_libraries(test_vggt
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME vggt_test COMMAND test_vggt)
