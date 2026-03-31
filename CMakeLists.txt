@@ -286,3 +286,18 @@ target_link_libraries(test_track_modules_utils
     -Wl,--allow-multiple-definition
 )
 add_test(NAME track_modules_utils_test COMMAND test_track_modules_utils)
+
+# Track Modules Modules Test
+add_executable(test_track_modules_modules
+    tests/test_track_modules_modules.cpp
+)
+target_link_libraries(test_track_modules_modules
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME track_modules_modules_test COMMAND test_track_modules_modules)
