@@ -9,21 +9,26 @@ namespace vggt {
 namespace utils {
 
 torch::Tensor randomly_limit_trues(const torch::Tensor& mask, int64_t max_trues) {
-    // 1D positions of all True entries
-    auto true_indices = torch::nonzero(mask).squeeze();
+    // Count total True values
+    auto flat_mask = mask.flatten();
+    auto true_count = flat_mask.sum().item<int64_t>();
 
     // if already within budget, return as-is
-    if (true_indices.size(0) <= max_trues) {
+    if (true_count <= max_trues) {
         return mask.clone();
     }
 
+    // Get 1D positions of all True entries
+    auto true_1d_indices = torch::nonzero(flat_mask).squeeze(-1);
+
     // randomly pick which True positions to keep
-    auto sampled_indices = torch::randperm(true_indices.size(0), torch::kLong).slice(0, 0, max_trues);
-    auto selected_indices = true_indices.index_select(0, sampled_indices);
+    auto sampled_indices = torch::randperm(true_count, torch::kLong).slice(0, 0, max_trues);
+    auto selected_1d_indices = true_1d_indices.index_select(0, sampled_indices);
 
     // build new flat mask: True only at sampled positions
-    auto limited_flat_mask = torch::zeros_like(mask.flatten(), torch::kBool);
-    limited_flat_mask.index_put_({selected_indices}, torch::ones_like(selected_indices, torch::kBool));
+    auto limited_flat_mask = torch::zeros_like(flat_mask);
+    auto true_values = torch::ones(selected_1d_indices.size(0), torch::TensorOptions().dtype(torch::kBool));
+    limited_flat_mask.index_put_({selected_1d_indices}, true_values);
 
     // restore original shape
     return limited_flat_mask.reshape(mask.sizes());

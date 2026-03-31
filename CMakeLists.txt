@@ -346,3 +346,18 @@ target_link_libraries(test_camera_head
     -Wl,--allow-multiple-definition
 )
 add_test(NAME camera_head_test COMMAND test_camera_head)
+
+# Helper Test
+add_executable(test_helper
+    tests/test_helper.cpp
+)
+target_link_libraries(test_helper
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME helper_test COMMAND test_helper)
