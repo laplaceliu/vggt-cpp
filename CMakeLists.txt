@@ -437,6 +437,21 @@ target_link_libraries(test_weight_loader
 )
 add_test(NAME weight_loader_test COMMAND test_weight_loader)
 
+# Base Track Predictor Test
+add_executable(test_base_track_predictor
+    tests/test_base_track_predictor.cpp
+)
+target_link_libraries(test_base_track_predictor
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME base_track_predictor_test COMMAND test_base_track_predictor)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
