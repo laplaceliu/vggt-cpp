@@ -148,3 +148,21 @@ target_link_libraries(test_swiglu_ffn
     -Wl,--allow-multiple-definition
 )
 add_test(NAME swiglu_ffn_test COMMAND test_swiglu_ffn)
+
+# PatchEmbed Test
+add_executable(test_patch_embed
+    tests/test_patch_embed.cpp
+)
+target_link_libraries(test_patch_embed
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME patch_embed_test COMMAND test_patch_embed)
+
+# Block Test - SKIPPED: Block/NestedTensorBlock have design issues with 
+# libtorch ModuleHolder (no default constructor, constructor forwarding issues)
