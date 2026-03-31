@@ -22,13 +22,11 @@ BaseTrackerPredictorImpl::BaseTrackerPredictorImpl(
     flows_emb_dim(latent_dim / 2),
     transformer_dim(corr_levels * std::pow(corr_radius * 2 + 1, 2) + latent_dim * 2) {
 
-    // Adjust transformer_dim to be divisible by 4
-    if (fine) {
-        // Old dummy code, will be removed when training next model
-        transformer_dim += (transformer_dim % 2 == 0) ? 4 : 5;
-    } else {
-        transformer_dim += (4 - transformer_dim % 4) % 4;
+    // Python logic: if transformer_dim % 2 == 0, add 4, then ensure divisible by 4
+    if (transformer_dim % 2 == 0) {
+        transformer_dim += 4;
     }
+    transformer_dim += (4 - transformer_dim % 4) % 4;
 
     int64_t space_depth = use_spaceatt ? depth : 0;
     int64_t time_depth = depth;
@@ -156,11 +154,10 @@ std::variant<
         auto corrdim = fcorrs.size(3);
 
         // Reshape fcorrs: B, S, N, corrdim -> B*N, S, corrdim
-        auto fcorrs_ = einops::rearrange(fcorrs, "b s n c -> (b n) s c");
+        auto fcorrs_ = fcorrs.permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
         // Movement of current coords relative to query points
-        auto flows = einops::rearrange(coords - coords.index({torch::indexing::Slice(), torch::indexing::Slice(0, 1)}),
-                                      "b s n c -> (b n) s c");
+        auto flows = (coords - coords.index({torch::indexing::Slice(), torch::indexing::Slice(0, 1)})).permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
         // Get 2D embedding for flows
         auto flows_emb = get_2d_embedding(flows, flows_emb_dim, false);
@@ -169,33 +166,35 @@ std::variant<
         flows_emb = torch::cat({flows_emb, flows}, -1);
 
         // Reshape track_feats: B, S, N, latent_dim -> B*N, S, latent_dim
-        auto track_feats_ = einops::rearrange(track_feats, "b s n c -> (b n) s c");
+        auto track_feats_ = track_feats.permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
         // Concatenate as input for transformer
         auto transformer_input = torch::cat({flows_emb, fcorrs_, track_feats_}, 2);
 
-        // Pad features if needed
+        // Pad or truncate features to match transformer_dim
         if (transformer_input.size(2) < transformer_dim) {
             auto pad_dim = transformer_dim - transformer_input.size(2);
             auto pad = torch::zeros_like(flows_emb.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, pad_dim)}));
             transformer_input = torch::cat({transformer_input, pad}, 2);
+        } else if (transformer_input.size(2) > transformer_dim) {
+            transformer_input = transformer_input.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, transformer_dim)});
         }
 
         // 2D positional embedding
         auto pos_embed = get_2d_sincos_pos_embed(transformer_dim, {HH, WW}).to(query_points.device());
         auto sampled_pos_emb = sample_features4d(pos_embed.expand({B, -1, -1, -1}), coords.index({torch::indexing::Slice(), 0}));
-        sampled_pos_emb = einops::rearrange(sampled_pos_emb, "b n c -> (b n) c").unsqueeze(1);
+        sampled_pos_emb = sampled_pos_emb.reshape({B * N, 1, -1});
 
         auto x = transformer_input + sampled_pos_emb;
 
         // Reshape: B*N, S, C -> B, N, S, C
-        x = einops::rearrange(x, "(b n) s d -> b n s d", einops::axis("b", B));
+        x = x.reshape({B, N, S, -1});
 
         // Compute delta coordinates and delta track features
         auto delta = updateformer->forward(x);
 
         // Reshape: B, N, S, C -> B*N, S, C
-        delta = einops::rearrange(delta, "b n s d -> (b n) s d", einops::axis("b", B));
+        delta = delta.reshape({B * N, S, -1});
 
         auto delta_coords_ = delta.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, 2)});
         auto delta_feats_ = delta.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(2)});

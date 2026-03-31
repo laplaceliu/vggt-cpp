@@ -97,7 +97,13 @@ AttnBlockImpl::AttnBlockImpl(int64_t hidden_size, int64_t num_heads,
 
 torch::Tensor AttnBlockImpl::forward(torch::Tensor x, torch::Tensor mask) {
     x = norm1->forward(x);
-    auto attn_output = attn.forward(x, x, x);
+    // MultiheadAttention with batch_first=False expects [seq, batch, embed]
+    // But x is in [batch, seq, embed] format
+    x = x.permute({1, 0, 2});  // [batch, seq, embed] -> [seq, batch, embed]
+    auto attn_module = attn.ptr()->as<torch::nn::MultiheadAttention>();
+    auto attn_output = std::get<0>(attn_module->forward(x, x, x));
+    x = x.permute({1, 0, 2});  // [seq, batch, embed] -> [batch, seq, embed]
+    attn_output = attn_output.permute({1, 0, 2});  // [seq, batch, embed] -> [batch, seq, embed]
     x = x + attn_output;
     x = x + mlp->forward(norm2->forward(x));
     return x;
@@ -118,7 +124,17 @@ CrossAttnBlockImpl::CrossAttnBlockImpl(int64_t hidden_size, int64_t context_dim,
 torch::Tensor CrossAttnBlockImpl::forward(torch::Tensor x, torch::Tensor context, torch::Tensor mask) {
     x = norm1->forward(x);
     context = norm_context->forward(context);
+    
+    // MultiheadAttention with batch_first=False expects [seq, batch, embed]
+    // But x and context are in [batch, seq, embed] format
+    x = x.permute({1, 0, 2});  // [batch, seq, embed] -> [seq, batch, embed]
+    context = context.permute({1, 0, 2});
+    
     auto attn_output = std::get<0>(cross_attn->forward(x, context, context, mask));
+    
+    x = x.permute({1, 0, 2});  // [seq, batch, embed] -> [batch, seq, embed]
+    attn_output = attn_output.permute({1, 0, 2});  // [seq, batch, embed] -> [batch, seq, embed]
+    
     x = x + attn_output;
     x = x + mlp->forward(norm2->forward(x));
     return x;

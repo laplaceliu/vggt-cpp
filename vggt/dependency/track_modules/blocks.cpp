@@ -247,6 +247,7 @@ torch::Tensor EfficientUpdateFormerImpl::forward(torch::Tensor input_tensor, tor
     auto init_tokens = tokens;
 
     auto B = tokens.size(0);
+    auto N = tokens.size(1);
     auto T = tokens.size(2);
 
     if (add_space_attn) {
@@ -254,7 +255,7 @@ torch::Tensor EfficientUpdateFormerImpl::forward(torch::Tensor input_tensor, tor
         tokens = torch::cat({tokens, virtual_tokens}, 1);
     }
 
-    auto N = tokens.size(1);
+    N = tokens.size(1);
 
     int64_t j = 0;
     for (int64_t i = 0; i < time_blocks->size(); ++i) {
@@ -299,15 +300,23 @@ CorrBlock::CorrBlock(const torch::Tensor& fmaps, int64_t num_levels, int64_t rad
     this->radius = radius;
     this->multiple_track_feats = multiple_track_feats;
 
+    // Level 0: original fmaps
     fmaps_pyramid.push_back(fmaps);
-    for (int64_t i = 0; i < num_levels - 1; ++i) {
-        auto fmaps_ = fmaps.reshape(std::vector<int64_t>{B * S, C, H, W});
-        fmaps_ = torch::nn::functional::avg_pool2d(fmaps_, torch::nn::functional::AvgPool2dFuncOptions(2).stride(2));
-        auto new_sizes = fmaps_.sizes();
+
+    // Build pyramid by progressively downsampling
+    torch::Tensor current = fmaps;
+    for (int64_t i = 1; i < num_levels; ++i) {
+        // Reshape current level for pooling: [B, S, C, H, W] -> [B*S, C, H, W]
+        auto current_reshaped = current.reshape(std::vector<int64_t>{B * S, C, H, W});
+        // Downsample by factor of 2
+        current_reshaped = torch::nn::functional::avg_pool2d(current_reshaped,
+            torch::nn::functional::AvgPool2dFuncOptions(2).stride(2));
+        auto new_sizes = current_reshaped.sizes();
         H = new_sizes[2];
         W = new_sizes[3];
-        auto new_fmaps = fmaps_.reshape(std::vector<int64_t>{B, S, C, H, W});
-        fmaps_pyramid.push_back(new_fmaps);
+        // Reshape back to [B, S, C, H, W]
+        current = current_reshaped.reshape(std::vector<int64_t>{B, S, C, H, W});
+        fmaps_pyramid.push_back(current);
     }
 }
 

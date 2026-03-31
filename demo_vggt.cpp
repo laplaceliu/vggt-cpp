@@ -340,8 +340,8 @@ int main(int argc, char** argv) {
             return 1;
         }
         
-        query_points = torch::tensor(pts).view({-1, 2});
-        std::cout << "Using " << query_points.size(0) << " query points" << std::endl;
+        query_points = torch::tensor(pts).view({1, -1, 2});  // [1, N, 2] - add batch dimension
+        std::cout << "Using " << query_points.size(1) << " query points" << std::endl;
     }
     
     // Run inference
