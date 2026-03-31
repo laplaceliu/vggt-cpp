@@ -86,7 +86,21 @@ TEST(VisionTransformerTest, ForwardBasic) {
 }
 
 TEST(VisionTransformerTest, ForwardWithMasks) {
-    GTEST_SKIP() << "Skipped: Mask handling in prepare_tokens_with_masks has dimension mismatch bug";
+    torch::manual_seed(42);
+
+    auto vit = vit_small();
+    torch::Tensor x = torch::randn({2, 3, 224, 224});
+
+    // Create mask with spatial dimensions matching num_patches (14x14 for 224x224 with patch_size=16)
+    torch::Tensor masks = torch::zeros({2, 14, 14}, torch::kBool);
+    masks[0][0][0] = true;
+    masks[1][7][7] = true;
+
+    torch::Tensor out = vit->forward(x, masks);
+
+    EXPECT_TRUE(out.defined());
+    EXPECT_EQ(out.dim(), 2);
+    EXPECT_EQ(out.size(0), 2);  // B
 }
 
 TEST(VisionTransformerTest, ForwardPreservesGrad) {
@@ -151,7 +165,21 @@ TEST(VisionTransformerTest, InterpolatePosEncoding) {
 }
 
 TEST(VisionTransformerTest, PrepareTokensWithMasks) {
-    GTEST_SKIP() << "Skipped: Mask handling in prepare_tokens_with_masks has dimension mismatch bug";
+    torch::manual_seed(42);
+
+    auto vit = vit_small();
+    torch::Tensor x = torch::randn({1, 3, 224, 224});
+
+    // Create mask with spatial dimensions (14x14 patches for 224x224 image)
+    torch::Tensor masks = torch::zeros({1, 14, 14}, torch::kBool);
+    masks[0][0][0] = true;  // Mask first patch
+
+    torch::Tensor tokens = vit->prepare_tokens_with_masks(x, masks);
+
+    EXPECT_TRUE(tokens.defined());
+    EXPECT_EQ(tokens.dim(), 3);
+    EXPECT_EQ(tokens.size(0), 1);  // B
+    EXPECT_EQ(tokens.size(2), 384);  // embed_dim
 }
 
 TEST(VisionTransformerTest, PrepareTokensWithoutMasks) {

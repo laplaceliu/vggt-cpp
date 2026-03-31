@@ -258,8 +258,11 @@ torch::Tensor DinoVisionTransformerImpl::prepare_tokens_with_masks(
 
     if (masks.defined() && masks.numel() > 0) {
         auto mask_token_expanded = mask_token.view({1, 1, -1});
-        auto mask_reshaped = masks.unsqueeze(-1);
-        x = torch::where(mask_reshaped, mask_token_expanded.to(x.dtype()), x);
+        // Flatten spatial dimensions of mask to match patch_embed output
+        // mask shape: [B, H, W] or [B, H//patch_size, W//patch_size]
+        // x shape after patch_embed: [B, num_patches, embed_dim]
+        auto mask_flat = masks.view({B, -1}).unsqueeze(-1);  // [B, num_patches, 1]
+        x = torch::where(mask_flat, mask_token_expanded.to(x.dtype()), x);
     }
 
     // Add cls_token
