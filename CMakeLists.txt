@@ -452,6 +452,21 @@ target_link_libraries(test_base_track_predictor
 )
 add_test(NAME base_track_predictor_test COMMAND test_base_track_predictor)
 
+# Track Refine Test
+add_executable(test_track_refine
+    tests/test_track_refine.cpp
+)
+target_link_libraries(test_track_refine
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME track_refine_test COMMAND test_track_refine)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
