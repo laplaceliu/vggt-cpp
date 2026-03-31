@@ -80,8 +80,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> TrackerPr
     torch::Tensor fine_pred_track, pred_score;
     if (fine_tracking) {
         // Refine the coarse prediction
+        // refine_track params: images, fine_fnet, fine_tracker, coarse_pred, compute_score, pradius=7, sradius=2, fine_iters=2, chunk=-1
         std::tie(fine_pred_track, pred_score) = track_modules::refine_track(
-            images, fine_fnet, fine_predictor, coarse_pred_track, false, fine_chunk
+            images, fine_fnet, fine_predictor, coarse_pred_track, false, 7, 2, 2, fine_chunk
         );
 
         if (inference) {
