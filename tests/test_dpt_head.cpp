@@ -214,9 +214,7 @@ TEST(FeatureFusionBlockTest, ForwardSingleInput) {
 }
 
 TEST(FeatureFusionBlockTest, ForwardTwoInputsWithResidual) {
-    // Skipped: library design issue - FeatureFusionBlock's residual connection
-    // in resConfUnit1 doesn't handle different resolutions before torch::add
-    GTEST_SKIP() << "Skipped due to library design issue: residual add requires same resolution";
+    // Test with two inputs of different resolutions - residual is now interpolated to match
     FeatureFusionBlock block(
         256,
         torch::nn::AnyModule(torch::nn::ReLU()),
@@ -230,8 +228,7 @@ TEST(FeatureFusionBlockTest, ForwardTwoInputsWithResidual) {
 }
 
 TEST(FeatureFusionBlockTest, ForwardDifferentResolutions) {
-    // Skipped: library design issue
-    GTEST_SKIP() << "Skipped due to library design issue: residual add requires same resolution";
+    // Test with inputs at different resolutions - residual is interpolated
     FeatureFusionBlock block(
         128,
         torch::nn::AnyModule(torch::nn::ReLU()),
@@ -244,8 +241,7 @@ TEST(FeatureFusionBlockTest, ForwardDifferentResolutions) {
 }
 
 TEST(FeatureFusionBlockTest, ForwardMultiBatch) {
-    // Skipped: library design issue
-    GTEST_SKIP() << "Skipped due to library design issue: residual add requires same resolution";
+    // Test with batch size > 1 and different resolutions
     FeatureFusionBlock block(
         256,
         torch::nn::AnyModule(torch::nn::ReLU()),
@@ -258,8 +254,7 @@ TEST(FeatureFusionBlockTest, ForwardMultiBatch) {
 }
 
 TEST(FeatureFusionBlockTest, ForwardOutputIsFinite) {
-    // Skipped: library design issue
-    GTEST_SKIP() << "Skipped due to library design issue: residual add requires same resolution";
+    // Test with different resolutions and small input values
     FeatureFusionBlock block(
         256,
         torch::nn::AnyModule(torch::nn::ReLU()),
@@ -272,15 +267,14 @@ TEST(FeatureFusionBlockTest, ForwardOutputIsFinite) {
 }
 
 TEST(FeatureFusionBlockTest, ForwardSizeOverride) {
-    // Skipped: library design issue
-    GTEST_SKIP() << "Skipped due to library design issue: residual add requires same resolution";
+    // Test with size override and two inputs of different resolutions
     FeatureFusionBlock block(
         256,
         torch::nn::AnyModule(torch::nn::ReLU()),
         false, false, false, true,
         c10::nullopt, true, 1
     );
-    std::vector<torch::Tensor> inputs = {torch::randn({1, 256, 32, 32})};
+    std::vector<torch::Tensor> inputs = {torch::randn({1, 256, 32, 32}), torch::randn({1, 256, 64, 64})};
     torch::Tensor output = block->forward(inputs, std::make_pair(16, 16));
     EXPECT_EQ(output.dim(), 4);
 }

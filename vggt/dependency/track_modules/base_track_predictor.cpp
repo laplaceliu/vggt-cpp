@@ -181,7 +181,8 @@ std::variant<
         }
 
         // 2D positional embedding
-        auto pos_embed = get_2d_sincos_pos_embed(transformer_dim, {HH, WW}).to(query_points.device());
+        auto [pos_embed, _grid] = get_2d_sincos_pos_embed(transformer_dim, {HH, WW});
+        pos_embed = pos_embed.to(query_points.device());
         auto sampled_pos_emb = sample_features4d(pos_embed.expand({B, -1, -1, -1}), coords.index({torch::indexing::Slice(), 0}));
         sampled_pos_emb = sampled_pos_emb.reshape({B * N, 1, -1});
 

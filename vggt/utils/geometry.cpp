@@ -109,12 +109,31 @@ torch::Tensor closed_form_inverse_se3(
     torch::Tensor R_transposed = R_extracted.transpose(1, 2);
     torch::Tensor top_right = -torch::matmul(R_transposed, T_extracted);
 
-    // Construct inverted matrix
-    torch::Tensor inverted_matrix = torch::eye(4, torch::TensorOptions().dtype(se3.dtype()).device(se3.device()));
-    inverted_matrix = inverted_matrix.unsqueeze(0).expand({se3.size(0), -1, -1});
+    // Construct inverted matrix directly to avoid slice assignment memory overlap issues
+    // For each SE3 matrix [R|t], inverse is [R^T|-R^T*t]
+    // Full 4x4 inverse matrix:
+    // [R^T(0,0), R^T(0,1), R^T(0,2), top_right(0)]
+    // [R^T(1,0), R^T(1,1), R^T(1,2), top_right(1)]
+    // [R^T(2,0), R^T(2,1), R^T(2,2), top_right(2)]
+    // [0, 0, 0, 1]
+    int64_t N = se3.size(0);
+    auto options = torch::TensorOptions().dtype(se3.dtype()).device(se3.device());
 
-    inverted_matrix.slice(1, 0, 3).slice(2, 0, 3) = R_transposed;
-    inverted_matrix.slice(1, 0, 3).slice(2, 3, 4) = top_right;
+    // Build the full inverted matrix using cat instead of slice assignment
+    torch::Tensor zeros_col = torch::zeros({N, 1, 1}, options);
+    torch::Tensor ones_col = torch::ones({N, 1, 1}, options);
+
+    // Row 0: [R_transposed[0], top_right[0]]
+    torch::Tensor row0 = torch::cat({R_transposed.slice(1, 0, 1), top_right.slice(1, 0, 1)}, 2);
+    // Row 1: [R_transposed[1], top_right[1]]
+    torch::Tensor row1 = torch::cat({R_transposed.slice(1, 1, 2), top_right.slice(1, 1, 2)}, 2);
+    // Row 2: [R_transposed[2], top_right[2]]
+    torch::Tensor row2 = torch::cat({R_transposed.slice(1, 2, 3), top_right.slice(1, 2, 3)}, 2);
+    // Row 3: [0, 0, 0, 1]
+    torch::Tensor row3 = torch::cat({torch::zeros({N, 1, 3}, options), ones_col}, 2);
+
+    // Stack all rows to form [N, 4, 4]
+    torch::Tensor inverted_matrix = torch::cat({row0, row1, row2, row3}, 1);
 
     return inverted_matrix;
 }

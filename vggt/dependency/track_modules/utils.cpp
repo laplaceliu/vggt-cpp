@@ -5,7 +5,7 @@ namespace dependency {
 namespace track_modules {
 
 // 2D sine-cosine positional embedding
-torch::Tensor get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& grid_size, bool return_grid) {
+std::tuple<torch::Tensor, torch::Tensor> get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& grid_size, bool return_grid) {
     int grid_size_h = grid_size.first;
     int grid_size_w = grid_size.second;
 
@@ -14,13 +14,20 @@ torch::Tensor get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& 
     auto grid = torch::meshgrid({grid_w, grid_h}, "xy");
     auto stacked_grid = torch::stack({grid[0], grid[1]}, 0);
     stacked_grid = stacked_grid.reshape({2, 1, grid_size_h, grid_size_w});
-    auto grid_tensor = stacked_grid;
 
     auto pos_embed = get_2d_sincos_pos_embed_from_grid(embed_dim, stacked_grid);
+    auto pos_embed_reshaped = pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2});
+
     if (return_grid) {
-        return torch::cat({pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2}), stacked_grid}, 0);
+        // Return tuple of (pos_embed, grid) to match Python behavior
+        return std::make_tuple(pos_embed_reshaped, stacked_grid);
     }
-    return pos_embed.reshape({1, grid_size_h, grid_size_w, -1}).permute({0, 3, 1, 2});
+    return std::make_tuple(pos_embed_reshaped, torch::Tensor());
+}
+
+torch::Tensor get_2d_sincos_pos_embed_simple(int embed_dim, const std::pair<int, int>& grid_size) {
+    auto [pos_embed, _] = get_2d_sincos_pos_embed(embed_dim, grid_size, false);
+    return pos_embed;
 }
 
 torch::Tensor get_2d_sincos_pos_embed_from_grid(int embed_dim, const torch::Tensor& grid) {

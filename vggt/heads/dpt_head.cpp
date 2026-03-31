@@ -184,6 +184,11 @@ torch::Tensor FeatureFusionBlockImpl::forward(
 
     if (has_residual_ && xs.size() >= 2) {
         torch::Tensor res = resConfUnit1->forward(xs[1]);
+        // Interpolate residual to match output resolution if they differ
+        if (res.sizes()[2] != output.sizes()[2] || res.sizes()[3] != output.sizes()[3]) {
+            res = custom_interpolate(res, std::make_pair(output.size(2), output.size(3)),
+                                     c10::nullopt, torch::kBilinear, align_corners_);
+        }
         output = torch::add(output, res);
     }
 

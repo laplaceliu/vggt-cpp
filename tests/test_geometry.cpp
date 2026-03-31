@@ -217,15 +217,52 @@ TEST(GeometryTest, UnprojectDepthMapToPointMap4D) {
 }
 
 TEST(GeometryTest, ClosedFormInverseSE3Batch) {
-    // SKIPPED: Library code has slice assignment memory overlap issue
-    // with batched SE3 matrices
-    GTEST_SKIP() << "Library has memory overlap issue with batched slice assignment";
+    // Test batched SE3 matrix inversion with [N, 4, 4] shape
+    torch::manual_seed(42);
+
+    int64_t N = 4;
+    torch::Tensor se3_batch = torch::randn({N, 4, 4});
+    // Make sure last row is [0, 0, 0, 1]
+    se3_batch.index({torch::indexing::Slice(), 3, torch::indexing::Slice()}) = torch::tensor({0.0, 0.0, 0.0, 1.0});
+
+    torch::Tensor inv_batch = closed_form_inverse_se3(se3_batch);
+
+    // Check output shape
+    EXPECT_EQ(inv_batch.dim(), 3);
+    EXPECT_EQ(inv_batch.size(0), N);
+    EXPECT_EQ(inv_batch.size(1), 4);
+    EXPECT_EQ(inv_batch.size(2), 4);
+
+    // Check that inverse of identity is identity
+    torch::Tensor identity = torch::eye(4).unsqueeze(0).expand({N, -1, -1});
+    torch::Tensor inv_identity = closed_form_inverse_se3(identity);
+    EXPECT_TRUE(torch::allclose(inv_identity, identity, 1e-4));
+
+    // Check output is finite
+    EXPECT_TRUE(torch::isfinite(inv_batch).all().item<bool>());
 }
 
 TEST(GeometryTest, ClosedFormInverseSE3DifferentShapes) {
-    // SKIPPED: Library code has slice assignment memory overlap issue
-    // with [B, 3, 4] shaped SE3 matrices
-    GTEST_SKIP() << "Library has memory overlap issue with [B,3,4] shaped SE3";
+    // Test SE3 matrix inversion with [N, 3, 4] shape (missing last row)
+    torch::manual_seed(42);
+
+    int64_t N = 3;
+    torch::Tensor se3_34 = torch::randn({N, 3, 4});
+
+    torch::Tensor inv_34 = closed_form_inverse_se3(se3_34);
+
+    // Check output shape - should be [N, 4, 4]
+    EXPECT_EQ(inv_34.dim(), 3);
+    EXPECT_EQ(inv_34.size(0), N);
+    EXPECT_EQ(inv_34.size(1), 4);
+    EXPECT_EQ(inv_34.size(2), 4);
+
+    // Check last row is [0, 0, 0, 1]
+    auto last_row = inv_34.index({torch::indexing::Slice(), 3, torch::indexing::Slice()});
+    EXPECT_TRUE(torch::allclose(last_row, torch::tensor({0.0, 0.0, 0.0, 1.0})));
+
+    // Check output is finite
+    EXPECT_TRUE(torch::isfinite(inv_34).all().item<bool>());
 }
 
 } // namespace

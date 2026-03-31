@@ -24,9 +24,18 @@ namespace track_modules {
  * @param grid_size Pair of (height, width) for the grid
  * @param return_grid If true, also return the coordinate grid
  * @return If return_grid=false: [1, embed_dim, H, W]
- *         If return_grid=true: [3, embed_dim, H, W] (embed + 2 coord channels)
+ *         If return_grid=true: tuple of (pos_embed [1, embed_dim, H, W], grid [2, 1, H, W])
  */
-torch::Tensor get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& grid_size, bool return_grid = false);
+std::tuple<torch::Tensor, torch::Tensor> get_2d_sincos_pos_embed(int embed_dim, const std::pair<int, int>& grid_size, bool return_grid = false);
+
+/**
+ * @brief Create 2D sinusoidal positional embedding (simple version)
+ *
+ * @param embed_dim Embedding dimension (must be even)
+ * @param grid_size Pair of (height, width) for the grid
+ * @return [1, embed_dim, H, W]
+ */
+torch::Tensor get_2d_sincos_pos_embed_simple(int embed_dim, const std::pair<int, int>& grid_size);
 
 /**
  * @brief Create 2D sinusoidal embedding from coordinate grid

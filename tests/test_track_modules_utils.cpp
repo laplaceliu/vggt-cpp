@@ -56,7 +56,8 @@ TEST(TrackModulesUtilsTest, Get2DSinCosPosEmbed) {
     int embed_dim = 32;
     std::pair<int, int> grid_size = {4, 4};
 
-    torch::Tensor embed = get_2d_sincos_pos_embed(embed_dim, grid_size, false);
+    // When return_grid=false, returns tuple (pos_embed, empty_tensor)
+    auto [embed, empty_grid] = get_2d_sincos_pos_embed(embed_dim, grid_size, false);
 
     // Shape: [1, embed_dim, H, W] = [1, 32, 4, 4]
     EXPECT_EQ(embed.dim(), 4);
@@ -64,11 +65,31 @@ TEST(TrackModulesUtilsTest, Get2DSinCosPosEmbed) {
     EXPECT_EQ(embed.size(1), embed_dim);
     EXPECT_EQ(embed.size(2), 4);
     EXPECT_EQ(embed.size(3), 4);
+    EXPECT_FALSE(empty_grid.defined()); // Second element should be undefined when return_grid=false
 }
 
 TEST(TrackModulesUtilsTest, Get2DSinCosPosEmbedWithGrid) {
-    // SKIPPED: Library has shape mismatch issue in get_2d_sincos_pos_embed when return_grid=true
-    GTEST_SKIP() << "Library has shape mismatch issue when return_grid=true";
+    torch::manual_seed(42);
+
+    int embed_dim = 32;
+    std::pair<int, int> grid_size = {4, 4};
+
+    // When return_grid=true, returns tuple of (pos_embed, grid)
+    auto [pos_embed, grid] = get_2d_sincos_pos_embed(embed_dim, grid_size, true);
+
+    // pos_embed shape: [1, embed_dim, H, W]
+    EXPECT_EQ(pos_embed.dim(), 4);
+    EXPECT_EQ(pos_embed.size(0), 1);
+    EXPECT_EQ(pos_embed.size(1), embed_dim);
+    EXPECT_EQ(pos_embed.size(2), 4);
+    EXPECT_EQ(pos_embed.size(3), 4);
+
+    // grid shape: [2, 1, H, W]
+    EXPECT_EQ(grid.dim(), 4);
+    EXPECT_EQ(grid.size(0), 2);  // x and y coordinates
+    EXPECT_EQ(grid.size(1), 1);
+    EXPECT_EQ(grid.size(2), 4);
+    EXPECT_EQ(grid.size(3), 4);
 }
 
 TEST(TrackModulesUtilsTest, Get2DSinCosPosEmbedDifferentSizes) {
@@ -78,7 +99,7 @@ TEST(TrackModulesUtilsTest, Get2DSinCosPosEmbedDifferentSizes) {
     std::vector<std::pair<int, int>> grid_sizes = {{2, 2}, {4, 4}, {8, 4}};
 
     for (const auto& grid_size : grid_sizes) {
-        torch::Tensor embed = get_2d_sincos_pos_embed(embed_dim, grid_size, false);
+        auto [embed, _] = get_2d_sincos_pos_embed(embed_dim, grid_size, false);
         EXPECT_EQ(embed.size(2), grid_size.first);
         EXPECT_EQ(embed.size(3), grid_size.second);
     }
