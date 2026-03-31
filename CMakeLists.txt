@@ -422,6 +422,21 @@ target_link_libraries(test_visual_track
 )
 add_test(NAME visual_track_test COMMAND test_visual_track)
 
+# Weight Loader Test
+add_executable(test_weight_loader
+    tests/test_weight_loader.cpp
+)
+target_link_libraries(test_weight_loader
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME weight_loader_test COMMAND test_weight_loader)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
