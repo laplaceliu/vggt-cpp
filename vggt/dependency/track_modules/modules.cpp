@@ -13,37 +13,39 @@ ResidualBlockImpl::ResidualBlockImpl(int64_t in_planes, int64_t planes, const st
 
     int64_t num_groups = planes / 8;
 
+    // Determine if we need downsample (for stride > 1 or channel change)
+    bool need_downsample = (stride != 1) || (in_planes != planes);
+
     if (norm_fn == "group") {
         norm1 = register_module("norm1", torch::nn::GroupNorm(num_groups, planes));
         norm2 = register_module("norm2", torch::nn::GroupNorm(num_groups, planes));
-        if (stride != 1) {
+        if (need_downsample) {
             norm3 = register_module("norm3", torch::nn::GroupNorm(num_groups, planes));
         }
     } else if (norm_fn == "batch") {
         norm1 = register_module("norm1", torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(planes)));
         norm2 = register_module("norm2", torch::nn::BatchNorm2d(planes));
-        if (stride != 1) {
+        if (need_downsample) {
             norm3 = register_module("norm3", torch::nn::BatchNorm2d(planes));
         }
     } else if (norm_fn == "instance") {
         norm1 = register_module("norm1", torch::nn::InstanceNorm2d(planes));
         norm2 = register_module("norm2", torch::nn::InstanceNorm2d(planes));
-        if (stride != 1) {
+        if (need_downsample) {
             norm3 = register_module("norm3", torch::nn::InstanceNorm2d(planes));
         }
     } else if (norm_fn == "none") {
         norm1 = register_module("norm1", utils::StackSequential());
         norm2 = register_module("norm2", utils::StackSequential());
-        if (stride != 1) {
+        if (need_downsample) {
             norm3 = register_module("norm3", utils::StackSequential());
         }
     } else {
         throw std::runtime_error("Norm function not implemented");
     }
 
-    if (stride == 1) {
-        downsample = nullptr;
-    } else {
+    // Create downsample if needed
+    if (need_downsample) {
         downsample = register_module("downsample", utils::StackSequential(
             torch::nn::Conv2d(torch::nn::Conv2dOptions(in_planes, planes, 1).stride(stride)),
             norm3

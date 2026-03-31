@@ -166,8 +166,25 @@ TEST(HeadActTest, ActivateHeadConfActivation) {
 }
 
 TEST(HeadActTest, ActivateHeadXYInvLog) {
-    // SKIPPED: xy_inv_log activation has numerical issues in test
-    GTEST_SKIP() << "xy_inv_log activation has numerical issues";
+    torch::manual_seed(42);
+
+    // Create input: xy in reasonable range, z should be positive for meaningful inv_log
+    // inv_log_transform: sign(y) * (exp(|y|) - 1)
+    // For positive y, this gives exp(y) - 1 > 0
+    torch::Tensor out = torch::zeros({1, 4, 4, 3});
+    out[0][0][0] = torch::tensor({0.5, 0.5, 1.0});  // xy, z (positive z)
+
+    // Test xy_inv_log activation
+    auto [pts3d, conf] = activate_head(out, "xy_inv_log", "expp1");
+
+    EXPECT_TRUE(pts3d.defined());
+    EXPECT_EQ(pts3d.size(-1), 3);  // xyz
+    
+    // Check that output is reasonable
+    // z is transformed by inv_log, xy is scaled by transformed z
+    EXPECT_TRUE(std::isfinite(pts3d[0][0][0][0].item<float>()));
+    EXPECT_TRUE(std::isfinite(pts3d[0][0][0][1].item<float>()));
+    EXPECT_TRUE(std::isfinite(pts3d[0][0][0][2].item<float>()));
 }
 
 TEST(HeadActTest, ActivateHeadUnknownActivation) {

@@ -49,8 +49,23 @@ TEST(ProjectionTest, ImgFromCamWithNoDistortion) {
 }
 
 TEST(ProjectionTest, ImgFromCamWithDepth) {
-    // SKIPPED: Tensor dimension construction issue in test
-    GTEST_SKIP() << "Tensor construction issue - needs further investigation";
+    torch::manual_seed(42);
+
+    // Identity intrinsics
+    torch::Tensor intrinsics = torch::eye(3).unsqueeze(0);
+
+    // Points at different depths
+    torch::Tensor points_cam = torch::tensor({
+        {{1.0, 2.0, 0.5},   // x
+         {1.0, 2.0, 0.5},   // y
+         {1.0, 2.0, 0.5}}   // z (different depths)
+    });
+
+    torch::Tensor points2D = img_from_cam(intrinsics, points_cam);
+
+    // All should project to same x/y since they're on same ray from origin
+    EXPECT_TRUE(points2D.defined());
+    EXPECT_EQ(points2D.size(1), 3);  // N=3 points
 }
 
 TEST(ProjectionTest, ImgFromCamWithDistortion) {
@@ -95,8 +110,23 @@ TEST(ProjectionTest, ImgFromCamWithExtraParams) {
 }
 
 TEST(ProjectionTest, ImgFromCamDefaultVal) {
-    // SKIPPED: Tensor dimension construction issue in test
-    GTEST_SKIP() << "Tensor construction issue - needs further investigation";
+    torch::manual_seed(42);
+
+    // Identity intrinsics
+    torch::Tensor intrinsics = torch::eye(3).unsqueeze(0);
+
+    // Point with z=0 (will cause division by zero -> nan -> replaced by default_val)
+    torch::Tensor points_cam = torch::tensor({
+        {{1.0},
+         {1.0},
+         {0.0}}  // z=0 causes nan
+    });
+
+    // Use default_val = 999.0
+    torch::Tensor points2D = img_from_cam(intrinsics, points_cam, torch::Tensor(), 999.0);
+
+    // NaN should be replaced with default_val
+    EXPECT_TRUE(torch::allclose(points2D[0][0], torch::tensor({999.0, 999.0})));
 }
 
 TEST(ProjectionTest, ImgFromCamBatch) {

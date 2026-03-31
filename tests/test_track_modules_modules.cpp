@@ -100,9 +100,7 @@ TEST(ResidualBlockTest, ForwardSameChannels) {
 }
 
 TEST(ResidualBlockTest, ForwardChannelExpansion) {
-    // Skipped: library implementation issue - when stride==1 and in_planes!=planes,
-    // no downsample is created but channels still need matching in residual connection
-    GTEST_SKIP() << "Skipped due to library implementation issue in residual connection";
+    // Test channel expansion with stride=1 - downsample conv should be created
     ResidualBlock block(64, 128, "instance", 1, 3);
     torch::Tensor input = torch::randn({2, 64, 32, 32});
     torch::Tensor output = block->forward(input);
