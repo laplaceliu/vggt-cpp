@@ -301,3 +301,18 @@ target_link_libraries(test_track_modules_modules
     -Wl,--allow-multiple-definition
 )
 add_test(NAME track_modules_modules_test COMMAND test_track_modules_modules)
+
+# DPT Head Test
+add_executable(test_dpt_head
+    tests/test_dpt_head.cpp
+)
+target_link_libraries(test_dpt_head
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME dpt_head_test COMMAND test_dpt_head)
