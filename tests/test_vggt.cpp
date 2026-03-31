@@ -93,7 +93,31 @@ TEST(VGGTTest, ForwardWithBatch) {
 }
 
 TEST(VGGTTest, ForwardWithQueryPoints) {
-    GTEST_SKIP() << "Skipped: Track head has pool2d output size bug with small images";
+    torch::manual_seed(42);
+
+    auto model = VGGT(
+        224,    // img_size - larger to avoid pool2d size issues
+        14,     // patch_size
+        256     // embed_dim
+    );
+
+    torch::Tensor images = torch::rand({2, 3, 224, 224});
+    // Query points: [N, 2] - normalized coordinates [0, 1]
+    torch::Tensor query_points = torch::tensor({{0.5, 0.5}, {0.25, 0.75}});
+
+    auto predictions = model->forward(images, query_points);
+
+    // Check tracking outputs are present
+    EXPECT_TRUE(predictions.find("track") != predictions.end());
+    EXPECT_TRUE(predictions.find("vis") != predictions.end());
+    EXPECT_TRUE(predictions.find("conf") != predictions.end());
+    
+    // Check track shape: [B, S, N, 2]
+    auto track = predictions["track"];
+    EXPECT_EQ(track.dim(), 4);
+    EXPECT_EQ(track.size(0), 1);  // B
+    EXPECT_EQ(track.size(1), 2);  // S
+    EXPECT_EQ(track.size(2), 2);  // N
 }
 
 TEST(VGGTTest, ForwardOutputShapes) {
@@ -191,7 +215,24 @@ TEST(VGGTTest, ForwardPreservesGrad) {
 }
 
 TEST(VGGTTest, ForwardWithBatchQueryPoints) {
-    GTEST_SKIP() << "Skipped: Track head has pool2d output size bug with small images";
+    torch::manual_seed(42);
+
+    auto model = VGGT(
+        224,    // img_size - larger to avoid pool2d issues
+        14,     // patch_size
+        256     // embed_dim
+    );
+
+    torch::Tensor images = torch::rand({1, 2, 3, 224, 224});
+    // Query points with batch dimension: [B, N, 2]
+    torch::Tensor query_points = torch::rand({1, 5, 2});
+
+    auto predictions = model->forward(images, query_points);
+
+    EXPECT_TRUE(predictions.find("track") != predictions.end());
+    EXPECT_EQ(predictions["track"].size(0), 1);  // B
+    EXPECT_EQ(predictions["track"].size(1), 2);  // S
+    EXPECT_EQ(predictions["track"].size(2), 5);  // N
 }
 
 TEST(VGGTTest, ForwardFullSize) {

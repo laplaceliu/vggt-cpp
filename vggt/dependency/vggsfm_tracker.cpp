@@ -12,7 +12,9 @@ TrackerPredictorImpl::TrackerPredictorImpl() {
     coarse_down_ratio = 2;
 
     // Create networks
-    coarse_fnet = register_module("coarse_fnet", track_modules::BasicEncoder(coarse_stride));
+    // BasicEncoder(input_dim=3, output_dim=128, stride=4)
+    coarse_fnet = register_module("coarse_fnet", track_modules::BasicEncoder(3, 128, coarse_stride));
+    // BaseTrackerPredictor(stride=4)
     coarse_predictor = register_module("coarse_predictor", track_modules::BaseTrackerPredictor(coarse_stride));
 
     // Create fine predictor with stride = 1
@@ -55,12 +57,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> TrackerPr
     }
 
     // Coarse prediction
-    auto result = coarse_predictor.forward(
-        query_points, fmaps, coarse_iters, coarse_down_ratio
+    // BaseTrackerPredictor::forward returns std::variant of two possible tuple types
+    using ReturnVariant = std::variant<
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor>,
+        std::tuple<std::vector<torch::Tensor>, torch::Tensor, torch::Tensor, torch::Tensor>
+    >;
+    auto result = coarse_predictor.forward<ReturnVariant>(
+        query_points, fmaps, coarse_iters, false, coarse_down_ratio
     );
-    auto coarse_pred_track_lists = result[0];
-    auto pred_vis = result[1];
-    auto coarse_pred_track = coarse_pred_track_lists[-1];
+    // Extract the first variant type (non-fine mode returns tuple of 2 elements)
+    auto result_tuple = std::get<std::tuple<std::vector<torch::Tensor>, torch::Tensor>>(result);
+    auto coarse_pred_track_lists = std::get<0>(result_tuple);
+    auto pred_vis = std::get<1>(result_tuple);
+    auto coarse_pred_track = coarse_pred_track_lists.back();
 
     if (inference) {
         // No need to call empty_cache in C++
@@ -89,7 +98,7 @@ torch::Tensor TrackerPredictorImpl::process_images_to_fmaps(torch::Tensor images
         auto scaled_images = torch::nn::functional::interpolate(
             images,
             torch::nn::functional::InterpolateFuncOptions()
-                .scale_factor(std::vector<double>{1.0 / coarse_down_ratio})
+                .scale_factor(std::vector<double>{1.0 / coarse_down_ratio, 1.0 / coarse_down_ratio})
                 .mode(torch::kBilinear)
                 .align_corners(true)
         );
