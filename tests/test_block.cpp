@@ -129,7 +129,23 @@ TEST(BlockTest, ForwardWithDropPath) {
 }
 
 TEST(BlockTest, ForwardWithQKNorm) {
-    GTEST_SKIP() << "Skipped: Empty AnyModule cannot be passed to Block constructor";
+    torch::manual_seed(42);
+
+    int64_t dim = 64;
+    int64_t num_heads = 4;
+
+    // Create Block with qk_norm enabled
+    Block block = Block(std::make_shared<BlockImpl>(
+        dim, num_heads, 4.0, true, true, true, 0.0, 0.0,
+        torch::Tensor(), 0.0, torch::nn::AnyModule(torch::nn::GELU()),
+        torch::nn::AnyModule(torch::nn::LayerNorm(torch::nn::LayerNormOptions({}))),
+        torch::nn::AnyModule(), torch::nn::AnyModule(), true, true));
+    
+    torch::Tensor x = torch::randn({2, 16, dim});
+    torch::Tensor out = block->forward(x);
+
+    EXPECT_EQ(out.sizes(), x.sizes());
+    EXPECT_TRUE(torch::isfinite(out).all().item<bool>());
 }
 
 // NestedTensorBlock tests
@@ -145,7 +161,27 @@ TEST(NestedTensorBlockTest, ConstructorBasic) {
 }
 
 TEST(NestedTensorBlockTest, ForwardNested) {
-    GTEST_SKIP() << "Skipped: NestedTensorBlock forward requires properly initialized submodules";
+    torch::manual_seed(42);
+
+    int64_t dim = 64;
+    int64_t num_heads = 4;
+
+    NestedTensorBlock block = NestedTensorBlock(std::make_shared<NestedTensorBlockImpl>(dim, num_heads));
+    
+    // Test with a list of tensors (nested tensor simulation)
+    std::vector<torch::Tensor> x_list = {
+        torch::randn({2, 16, dim}),
+        torch::randn({2, 20, dim}),
+        torch::randn({2, 12, dim})
+    };
+
+    auto out_list = block->forward_nested(x_list);
+
+    EXPECT_EQ(out_list.size(), x_list.size());
+    for (size_t i = 0; i < x_list.size(); ++i) {
+        EXPECT_EQ(out_list[i].sizes(), x_list[i].sizes());
+        EXPECT_TRUE(torch::isfinite(out_list[i]).all().item<bool>());
+    }
 }
 
 TEST(NestedTensorBlockTest, ForwardSingleTensor) {
@@ -163,7 +199,33 @@ TEST(NestedTensorBlockTest, ForwardSingleTensor) {
 }
 
 TEST(NestedTensorBlockTest, ForwardNestedPreservesGrad) {
-    GTEST_SKIP() << "Skipped: NestedTensorBlock forward requires properly initialized submodules";
+    torch::manual_seed(42);
+
+    int64_t dim = 64;
+    int64_t num_heads = 4;
+
+    NestedTensorBlock block = NestedTensorBlock(std::make_shared<NestedTensorBlockImpl>(dim, num_heads));
+    
+    // Test gradient preservation with nested tensors
+    std::vector<torch::Tensor> x_list = {
+        torch::randn({2, 16, dim}, torch::requires_grad()),
+        torch::randn({2, 20, dim}, torch::requires_grad()),
+        torch::randn({2, 12, dim}, torch::requires_grad())
+    };
+
+    auto out_list = block->forward_nested(x_list);
+
+    // Backward through all outputs
+    torch::Tensor total = torch::zeros({1});
+    for (auto& out : out_list) {
+        total = total + out.sum();
+    }
+    total.backward();
+
+    // Check gradients are defined
+    for (auto& x : x_list) {
+        EXPECT_TRUE(x.grad().defined());
+    }
 }
 
 // Helper function tests

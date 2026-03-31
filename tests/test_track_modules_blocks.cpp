@@ -216,11 +216,47 @@ TEST(EfficientUpdateFormerTest, InitializeWeights) {
 }
 
 TEST(EfficientUpdateFormerTest, ForwardBasic) {
-    GTEST_SKIP() << "Skipped: Forward requires complex input tensor preparation";
+    torch::manual_seed(42);
+
+    // Create EfficientUpdateFormer with space attention
+    EfficientUpdateFormer former(
+        2, 4, 320, 384, 8, 130, 4.0, true, 64
+    );
+
+    // Input: [B, N, T, C] = [1, 4, 8, 320]
+    torch::Tensor input = torch::randn({1, 4, 8, 320});
+
+    auto output = former->forward(input);
+
+    // Output should be [B, N, T, output_dim] = [1, 4, 8, 130]
+    EXPECT_EQ(output.dim(), 4);
+    EXPECT_EQ(output.size(0), 1);
+    EXPECT_EQ(output.size(1), 4);
+    EXPECT_EQ(output.size(2), 8);
+    EXPECT_EQ(output.size(3), 130);
+    EXPECT_TRUE(torch::isfinite(output).all().item<bool>());
 }
 
 TEST(EfficientUpdateFormerTest, ForwardWithoutSpaceAttn) {
-    GTEST_SKIP() << "Skipped: Forward requires complex input tensor preparation";
+    torch::manual_seed(42);
+
+    // Create EfficientUpdateFormer without space attention
+    EfficientUpdateFormer former(
+        2, 4, 320, 384, 8, 130, 4.0, false, 0
+    );
+
+    // Input: [B, N, T, C] = [2, 6, 8, 320]
+    torch::Tensor input = torch::randn({2, 6, 8, 320});
+
+    auto output = former->forward(input);
+
+    // Output should be [B, N, T, output_dim] = [2, 6, 8, 130]
+    EXPECT_EQ(output.dim(), 4);
+    EXPECT_EQ(output.size(0), 2);
+    EXPECT_EQ(output.size(1), 6);
+    EXPECT_EQ(output.size(2), 8);
+    EXPECT_EQ(output.size(3), 130);
+    EXPECT_TRUE(torch::isfinite(output).all().item<bool>());
 }
 
 } // namespace

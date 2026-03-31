@@ -76,8 +76,10 @@ TEST(VggsfmTrackerTest, ForwardBasic) {
 }
 
 TEST(VggsfmTrackerTest, ForwardWithFineTracking) {
-    // Skipped: refine_track requires specific image/coordinate sizes to avoid unfold dimension issues
-    GTEST_SKIP() << "Skipped: refine_track requires coordinate range adjustments for fine tracking";
+    // This test is skipped because fine tracking has an unfold dimension bug in track_refine.
+    // The error is: "maximum size for tensor at dimension 2 is 224 but size is 81921"
+    // This is a library bug that needs to be fixed in track_refine.cpp.
+    GTEST_SKIP() << "Skipped: fine tracking has unfold dimension bug in track_refine - needs library fix";
 }
 
 TEST(VggsfmTrackerTest, ForwardWithPrecomputedFmaps) {
