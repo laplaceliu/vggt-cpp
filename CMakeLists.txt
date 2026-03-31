@@ -35,9 +35,11 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(Matplot++ REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Torch REQUIRED)
+find_package(GTest REQUIRED)
 
 include_directories(
     ${CUDAToolkit_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${DEPENDENCIES}/include
     ${DEPENDENCIES}/include/opencv4
     ${DEPENDENCIES}/include/eigen3
@@ -66,3 +68,68 @@ target_link_libraries(demo_vggt
     ${TORCH_LIBRARIES}
     -Wl,--allow-multiple-definition
 )
+
+################################################################################
+# Unit Tests
+################################################################################
+enable_testing()
+
+# MLP Test
+add_executable(test_mlp
+    tests/test_mlp.cpp
+)
+target_link_libraries(test_mlp
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME mlp_test COMMAND test_mlp)
+
+# DropPath Test
+add_executable(test_drop_path
+    tests/test_drop_path.cpp
+)
+target_link_libraries(test_drop_path
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME drop_path_test COMMAND test_drop_path)
+
+# LayerScale Test
+add_executable(test_layer_scale
+    tests/test_layer_scale.cpp
+)
+target_link_libraries(test_layer_scale
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME layer_scale_test COMMAND test_layer_scale)
+
+# Attention Test
+add_executable(test_attention
+    tests/test_attention.cpp
+)
+target_link_libraries(test_attention
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME attention_test COMMAND test_attention)

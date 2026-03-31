@@ -1,3 +1,9 @@
+/**
+ * @file attention.cpp
+ * @brief Implementation of multi-head attention module
+ * @see attention.h
+ */
+
 #include "attention.h"
 #include "rope.h"
 #include <torch/torch.h>
@@ -5,6 +11,23 @@
 namespace vggt {
 namespace layers {
 
+/**
+ * @brief Constructor for AttentionImpl
+ * 
+ * Initializes QKV projection, optional QK normalization layers,
+ * dropout layers, output projection, and optionally RoPE.
+ * 
+ * @param dim Feature dimension (must be divisible by num_heads)
+ * @param num_heads Number of attention heads
+ * @param qkv_bias Whether to use bias in QKV linear layer
+ * @param proj_bias Whether to use bias in output projection
+ * @param attn_drop_prob Dropout probability for attention weights
+ * @param proj_drop_prob Dropout probability for output
+ * @param norm_layer Normalization layer module
+ * @param qk_norm Whether to apply QK normalization
+ * @param fused_attn Whether to use fused attention computation
+ * @param rope Rotary position embedding module
+ */
 AttentionImpl::AttentionImpl(
     int64_t dim,
     int64_t num_heads,
@@ -46,6 +69,15 @@ AttentionImpl::AttentionImpl(
     }
 }
 
+/**
+ * @brief Forward pass for multi-head self-attention
+ * 
+ * Computes self-attention with optional RoPE and QK normalization.
+ * 
+ * @param x Input tensor of shape [B, N, C]
+ * @param pos Optional position embeddings for RoPE
+ * @return Output tensor of shape [B, N, C]
+ */
 torch::Tensor AttentionImpl::forward(torch::Tensor x, torch::Tensor pos) {
     auto B = x.size(0);
     auto N = x.size(1);
@@ -100,6 +132,17 @@ torch::Tensor AttentionImpl::forward(torch::Tensor x, torch::Tensor pos) {
     return x_out;
 }
 
+/**
+ * @brief Forward pass for memory-efficient attention
+ * 
+ * Currently requires xFormers for nested tensors support.
+ * Without xFormers, falls back to standard attention.
+ * 
+ * @param x Input tensor of shape [B, N, C]
+ * @param attn_bias Attention bias (required for xFormers)
+ * @param pos Position embeddings (optional)
+ * @return Output tensor of shape [B, N, C]
+ */
 torch::Tensor MemEffAttentionImpl::forward(torch::Tensor x, torch::Tensor attn_bias, torch::Tensor pos) {
     if (attn_bias.defined()) {
         TORCH_CHECK(false, "xFormers is required for using nested tensors");
