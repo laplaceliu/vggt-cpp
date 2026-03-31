@@ -1,4 +1,5 @@
 #include "rotation.h"
+#include <numeric>
 
 namespace vggt {
 namespace utils {
@@ -24,7 +25,12 @@ torch::Tensor quat_to_mat(const torch::Tensor& quaternions) {
         1 - two_s * (i * i + j * j)
     }, -1);
 
-    return o.reshape(quaternions.sizes().slice(0, -1)).reshape({-1, 3, 3});
+    // Fix: use proper batch dimension calculation instead of slice(0, -1)
+    auto batch_sizes = quaternions.sizes().vec();
+    batch_sizes.pop_back();  // Remove last dimension (4)
+    batch_sizes.push_back(3);
+    batch_sizes.push_back(3);
+    return o.reshape(batch_sizes);
 }
 
 torch::Tensor mat_to_quat(const torch::Tensor& matrix) {
@@ -32,10 +38,12 @@ torch::Tensor mat_to_quat(const torch::Tensor& matrix) {
         throw std::runtime_error("Invalid rotation matrix shape.");
     }
 
-    auto batch_dim = matrix.sizes().slice(0, -2);
-    auto batch_vec = batch_dim.vec();
-    batch_vec.push_back(9);
-    auto m = matrix.reshape(batch_vec);
+    // Fix: use proper batch dimension calculation instead of slice(0, -2)
+    auto batch_sizes = matrix.sizes().vec();
+    batch_sizes.pop_back();  // Remove 3
+    batch_sizes.pop_back();  // Remove 3
+    auto batch_numel = std::accumulate(batch_sizes.begin(), batch_sizes.end(), 1, std::multiplies<int64_t>());
+    auto m = matrix.reshape({batch_numel, 9});
     auto m00 = m.select(-1, 0);
     auto m01 = m.select(-1, 1);
     auto m02 = m.select(-1, 2);
@@ -66,7 +74,14 @@ torch::Tensor mat_to_quat(const torch::Tensor& matrix) {
     auto quat_candidates = quat_by_rijk / (2.0 * q_abs.unsqueeze(-1).max(flr));
 
     auto out = quat_candidates.index_select(-2, q_abs.argmax(-1)).squeeze(-2);
-    out = out.index_select(-1, torch::tensor({1, 2, 3, 0}, torch::TensorOptions().device(out.device())));
+    out = out.index_select(-1, torch::tensor({1, 2, 3, 0}, torch::TensorOptions().device(out.device()).dtype(torch::kLong)));
+
+    // Reshape back to original batch dimensions + [4]
+    auto output_sizes = matrix.sizes().vec();
+    output_sizes.pop_back();  // Remove 3
+    output_sizes.pop_back();  // Remove 3
+    output_sizes.push_back(4);  // Add 4 for quaternion
+    out = out.reshape(output_sizes);
 
     return standardize_quaternion(out);
 }
@@ -83,7 +98,7 @@ torch::Tensor _sqrt_positive_part(const torch::Tensor& x) {
 }
 
 torch::Tensor standardize_quaternion(const torch::Tensor& quaternions) {
-    return torch::where(quaternions.index_select(-1, torch::tensor({3}, torch::TensorOptions().device(quaternions.device()))) < 0,
+    return torch::where(quaternions.index_select(-1, torch::tensor({3}, torch::TensorOptions().device(quaternions.device()).dtype(torch::kLong))) < 0,
                        -quaternions, quaternions);
 }
 
