@@ -47,7 +47,7 @@ inline std::tuple<int64_t, int64_t> make_2tuple(const std::tuple<int64_t, int64_
 class PatchEmbedImpl : public torch::nn::Module {
 public:
     /**
-     * @brief Construct a PatchEmbed layer
+     * @brief Construct a PatchEmbed layer with square patches
      * @param img_size Input image size (default: 224)
      * @param patch_size Size of each patch (default: 16)
      * @param in_chans Number of input channels (default: 3)
@@ -58,6 +58,24 @@ public:
     PatchEmbedImpl(
         int64_t img_size = 224,
         int64_t patch_size = 16,
+        int64_t in_chans = 3,
+        int64_t embed_dim = 768,
+        torch::nn::AnyModule norm_layer = torch::nn::AnyModule(),
+        bool flatten_embedding = true
+    );
+
+    /**
+     * @brief Construct a PatchEmbed layer with non-square patches
+     * @param img_size Input image size as tuple (H, W)
+     * @param patch_size Patch size as tuple (H, W)
+     * @param in_chans Number of input channels (default: 3)
+     * @param embed_dim Embedding dimension (default: 768)
+     * @param norm_layer Optional normalization layer
+     * @param flatten_embedding Whether to flatten spatial dims (default: true)
+     */
+    PatchEmbedImpl(
+        std::tuple<int64_t, int64_t> img_size,
+        std::tuple<int64_t, int64_t> patch_size,
         int64_t in_chans = 3,
         int64_t embed_dim = 768,
         torch::nn::AnyModule norm_layer = torch::nn::AnyModule(),

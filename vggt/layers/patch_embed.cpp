@@ -10,10 +10,19 @@ PatchEmbedImpl::PatchEmbedImpl(
     int64_t embed_dim,
     torch::nn::AnyModule norm_layer,
     bool flatten_embedding
+) : PatchEmbedImpl(make_2tuple(img_size), make_2tuple(patch_size), in_chans, embed_dim, norm_layer, flatten_embedding) {}
+
+PatchEmbedImpl::PatchEmbedImpl(
+    std::tuple<int64_t, int64_t> img_size,
+    std::tuple<int64_t, int64_t> patch_size,
+    int64_t in_chans,
+    int64_t embed_dim,
+    torch::nn::AnyModule norm_layer,
+    bool flatten_embedding
 ) : use_norm_(!norm_layer.is_empty()) {
-    // Convert single values to (H, W) tuples using make_2tuple
-    img_size_ = make_2tuple(img_size);
-    patch_size_ = make_2tuple(patch_size);
+    // Store the tuple values directly
+    img_size_ = img_size;
+    patch_size_ = patch_size;
     
     // Compute number of patches in each spatial dimension
     patches_resolution_ = std::make_tuple(

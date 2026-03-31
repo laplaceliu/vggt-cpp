@@ -219,12 +219,30 @@ TEST(PatchEmbedTest, OutputFiniteValues) {
     EXPECT_TRUE(torch::isfinite(output).all().item<bool>());
 }
 
-TEST(PatchEmbedTest, NonSquarePatchNotSupported) {
-    // Note: PatchEmbed constructor takes single int64_t patch_size,
-    // and internally uses make_2tuple to convert to (H, W).
-    // So non-square patches need to be handled differently.
-    // This test documents that the current implementation only supports square patches.
-    GTEST_SKIP() << "PatchEmbed only supports square patch sizes";
+TEST(PatchEmbedTest, NonSquarePatch) {
+    torch::manual_seed(42);
+
+    // Test with non-square patches using the tuple constructor
+    // Image: 64x32, Patch: 8x4 -> Should produce 8x8 = 64 patches
+    PatchEmbed patch_embed(
+        std::make_tuple(64, 32),    // img_size (H, W)
+        std::make_tuple(8, 4),      // patch_size (H, W)
+        3,                          // in_chans
+        64                          // embed_dim
+    );
+    patch_embed->eval();
+
+    // Input: [B, C, H, W] = [2, 3, 64, 32]
+    torch::Tensor x = torch::randn({2, 3, 64, 32});
+
+    torch::Tensor output = patch_embed->forward(x);
+
+    // Output: [B, num_patches, embed_dim]
+    // num_patches = (64/8) * (32/4) = 8 * 8 = 64
+    EXPECT_EQ(output.dim(), 3);
+    EXPECT_EQ(output.size(0), 2);   // batch
+    EXPECT_EQ(output.size(1), 64);  // num_patches = 8 * 8
+    EXPECT_EQ(output.size(2), 64);  // embed_dim
 }
 
 } // namespace

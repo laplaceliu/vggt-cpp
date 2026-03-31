@@ -246,8 +246,33 @@ TEST(ProjectionTest, Project3DPointsBatchCameras) {
 }
 
 TEST(ProjectionTest, Project3DPointsHomogeneousCoords) {
-    // SKIPPED: Library expects [N,3] not [N,4] for 3D points
-    GTEST_SKIP() << "Homogeneous coordinates not supported by library API";
+    torch::manual_seed(42);
+
+    // 3D points in homogeneous coordinates [N, 4]
+    torch::Tensor points3D_homo = torch::tensor({
+        {1.0, 1.0, 1.0, 1.0},
+        {2.0, 1.0, 1.0, 1.0},
+        {1.0, 2.0, 1.0, 1.0}
+    });
+
+    // Extrinsics [B=1, 3, 4]
+    torch::Tensor extrinsics = torch::zeros({1, 3, 4});
+    extrinsics[0][0][0] = 1;
+    extrinsics[0][1][1] = 1;
+    extrinsics[0][2][2] = 1;
+
+    // Intrinsics [B=1, 3, 3]
+    torch::Tensor intrinsics = torch::eye(3).unsqueeze(0) * 500;
+
+    // Project homogeneous coordinates - should work now
+    auto [points2D, points_cam] = project_3D_points(points3D_homo, extrinsics, intrinsics);
+
+    EXPECT_TRUE(points2D.defined());
+    EXPECT_TRUE(points_cam.defined());
+    EXPECT_EQ(points2D.size(0), 1);  // B
+    EXPECT_EQ(points2D.size(1), 3);  // N
+    EXPECT_EQ(points_cam.size(0), 1);  // B
+    EXPECT_EQ(points_cam.size(1), 3);  // 3 (x, y, z)
 }
 
 } // namespace

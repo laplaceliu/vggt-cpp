@@ -62,12 +62,19 @@ std::tuple<torch::Tensor, torch::Tensor> project_3D_points(
     int64_t N = points3D.size(0);  // Number of points
     int64_t B = extrinsics.size(0);  // Batch size, i.e., number of cameras
     
-    // Create homogeneous coordinates
-    torch::Tensor points3D_homogeneous = torch::cat({
-        points3D, 
-        torch::ones_like(points3D.index({torch::indexing::Slice(), 
-                                        torch::indexing::Slice(0, 1)}))
-    }, 1);  // Nx4
+    // Check if input is already homogeneous (4 columns) or regular 3D (3 columns)
+    torch::Tensor points3D_homogeneous;
+    if (points3D.size(1) == 4) {
+        // Input is already homogeneous coordinates [N, 4]
+        points3D_homogeneous = points3D;
+    } else {
+        // Input is regular 3D coordinates [N, 3], convert to homogeneous
+        points3D_homogeneous = torch::cat({
+            points3D, 
+            torch::ones_like(points3D.index({torch::indexing::Slice(), 
+                                            torch::indexing::Slice(0, 1)}))
+        }, 1);  // Nx4
+    }
     
     // Reshape for batch processing
     torch::Tensor points3D_homogeneous_B = points3D_homogeneous.unsqueeze(0).expand({B, -1, -1});  // BxNx4
