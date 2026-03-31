@@ -271,3 +271,18 @@ target_link_libraries(test_stack_sequential
     -Wl,--allow-multiple-definition
 )
 add_test(NAME stack_sequential_test COMMAND test_stack_sequential)
+
+# Track Modules Utils Test
+add_executable(test_track_modules_utils
+    tests/test_track_modules_utils.cpp
+)
+target_link_libraries(test_track_modules_utils
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME track_modules_utils_test COMMAND test_track_modules_utils)
