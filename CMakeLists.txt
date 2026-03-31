@@ -407,6 +407,21 @@ target_link_libraries(test_vggsfm_tracker
 )
 add_test(NAME vggsfm_tracker_test COMMAND test_vggsfm_tracker)
 
+# Visual Track Test
+add_executable(test_visual_track
+    tests/test_visual_track.cpp
+)
+target_link_libraries(test_visual_track
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME visual_track_test COMMAND test_visual_track)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
