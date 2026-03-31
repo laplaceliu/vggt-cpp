@@ -226,3 +226,48 @@ target_link_libraries(test_projection
     -Wl,--allow-multiple-definition
 )
 add_test(NAME projection_test COMMAND test_projection)
+
+# Head Activation Functions Test
+add_executable(test_head_act
+    tests/test_head_act.cpp
+)
+target_link_libraries(test_head_act
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME head_act_test COMMAND test_head_act)
+
+# Heads Utils Test
+add_executable(test_heads_utils
+    tests/test_heads_utils.cpp
+)
+target_link_libraries(test_heads_utils
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME heads_utils_test COMMAND test_heads_utils)
+
+# Stack Sequential Test
+add_executable(test_stack_sequential
+    tests/test_stack_sequential.cpp
+)
+target_link_libraries(test_stack_sequential
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME stack_sequential_test COMMAND test_stack_sequential)
