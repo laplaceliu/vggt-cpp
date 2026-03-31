@@ -164,5 +164,20 @@ target_link_libraries(test_patch_embed
 )
 add_test(NAME patch_embed_test COMMAND test_patch_embed)
 
+# RoPE Test
+add_executable(test_rope
+    tests/test_rope.cpp
+)
+target_link_libraries(test_rope
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME rope_test COMMAND test_rope)
+
 # Block Test - SKIPPED: Block/NestedTensorBlock have design issues with 
 # libtorch ModuleHolder (no default constructor, constructor forwarding issues)
