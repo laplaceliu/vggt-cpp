@@ -331,3 +331,18 @@ target_link_libraries(test_track_modules_blocks
     -Wl,--allow-multiple-definition
 )
 add_test(NAME track_modules_blocks_test COMMAND test_track_modules_blocks)
+
+# Camera Head Test
+add_executable(test_camera_head
+    tests/test_camera_head.cpp
+)
+target_link_libraries(test_camera_head
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME camera_head_test COMMAND test_camera_head)
