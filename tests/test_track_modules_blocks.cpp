@@ -116,9 +116,7 @@ TEST(ShallowEncoderTest, ConstructorNoNorm) {
     });
 }
 
-TEST(ShallowEncoderTest, ConstructorInvalidNorm) {
-    GTEST_SKIP() << "Skipped: library throws std::runtime_error for invalid norm";
-}
+
 
 TEST(ShallowEncoderTest, ForwardBasic) {
     ShallowEncoder encoder(3, 32, 1, "instance");
@@ -177,10 +175,7 @@ TEST(CorrBlockTest, CorrBasic) {
     });
 }
 
-TEST(CorrBlockTest, SampleWithoutCorr) {
-    // This test is skipped because sample() requires corr() to be called first
-    GTEST_SKIP() << "Skipped: sample() requires corr() called first";
-}
+
 
 // ==================== EfficientUpdateFormer Tests ====================
 

@@ -51,7 +51,6 @@ TEST(CustomInterpolateTest, OutputIsFinite) {
 }
 
 TEST(CustomInterpolateTest, NeitherSizeNorScaleProvided) {
-    GTEST_SKIP() << "Skipped: library throws runtime_error but we expect it correctly";
     torch::Tensor input = torch::randn({1, 3, 32, 32});
     EXPECT_THROW(
         custom_interpolate(input, c10::nullopt, c10::nullopt, torch::kBilinear, true),
