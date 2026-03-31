@@ -245,11 +245,6 @@ TEST(ProjectionTest, Project3DPointsBatchCameras) {
     EXPECT_EQ(points_cam.size(0), 2);  // B
 }
 
-TEST(ProjectionTest, Project3DPointsWithExtrinsicTransform) {
-    // SKIPPED: Test requires careful understanding of coordinate systems
-    GTEST_SKIP() << "Complex coordinate transform test skipped for now";
-}
-
 TEST(ProjectionTest, Project3DPointsHomogeneousCoords) {
     // SKIPPED: Library expects [N,3] not [N,4] for 3D points
     GTEST_SKIP() << "Homogeneous coordinates not supported by library API";

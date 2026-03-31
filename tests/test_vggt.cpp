@@ -235,14 +235,6 @@ TEST(VGGTTest, ForwardWithBatchQueryPoints) {
     EXPECT_EQ(predictions["track"].size(2), 5);  // N
 }
 
-TEST(VGGTTest, ForwardFullSize) {
-    GTEST_SKIP() << "Skipped: Full size (518x518) model test requires significant memory and time";
-}
-
-TEST(VGGTTest, ForwardWithManyQueryPoints) {
-    GTEST_SKIP() << "Skipped: Many query points test requires significant memory";
-}
-
 } // namespace
 } // namespace models
 } // namespace vggt

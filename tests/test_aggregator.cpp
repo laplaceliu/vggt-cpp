@@ -228,14 +228,6 @@ TEST(AggregatorTest, ForwardPreservesGrad) {
     EXPECT_TRUE(images.grad().defined());
 }
 
-TEST(AggregatorTest, ForwardWithDepth24) {
-    GTEST_SKIP() << "Skipped: Full depth (24) aggregator test requires significant memory and time";
-}
-
-TEST(AggregatorTest, ForwardLargeImage) {
-    GTEST_SKIP() << "Skipped: Large image test requires significant memory";
-}
-
 } // namespace
 } // namespace models
 } // namespace vggt
