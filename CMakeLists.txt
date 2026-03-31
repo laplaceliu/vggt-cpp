@@ -133,3 +133,18 @@ target_link_libraries(test_attention
     -Wl,--allow-multiple-definition
 )
 add_test(NAME attention_test COMMAND test_attention)
+
+# SwiGLUFFN Test
+add_executable(test_swiglu_ffn
+    tests/test_swiglu_ffn.cpp
+)
+target_link_libraries(test_swiglu_ffn
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME swiglu_ffn_test COMMAND test_swiglu_ffn)
