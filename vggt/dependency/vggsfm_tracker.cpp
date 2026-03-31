@@ -104,6 +104,7 @@ torch::Tensor TrackerPredictorImpl::process_images_to_fmaps(torch::Tensor images
                 .scale_factor(std::vector<double>{1.0 / coarse_down_ratio, 1.0 / coarse_down_ratio})
                 .mode(torch::kBilinear)
                 .align_corners(true)
+                .recompute_scale_factor(true)
         );
         return coarse_fnet.forward(scaled_images);
     } else {

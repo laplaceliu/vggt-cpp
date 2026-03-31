@@ -231,6 +231,7 @@ torch::Tensor DinoVisionTransformerImpl::interpolate_pos_encoding(
                 .mode(torch::kBicubic)
                 .align_corners(false)
                 .antialias(interpolate_antialias_)
+                .recompute_scale_factor(true)
         );
     } else {
         patch_pos_embed_interp = torch::nn::functional::interpolate(

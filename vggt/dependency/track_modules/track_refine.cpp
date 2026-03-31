@@ -366,7 +366,7 @@ torch::Tensor compute_score_fn(
     // Create normalized grid
     auto y_grid = torch::linspace(-1.0, 1.0, ssize, heatmap.options());
     auto x_grid = torch::linspace(-1.0, 1.0, ssize, heatmap.options());
-    auto meshgrid = torch::meshgrid({y_grid, x_grid});
+    auto meshgrid = torch::meshgrid({y_grid, x_grid}, "ij");
     auto grid_x = meshgrid[0];
     auto grid_y = meshgrid[1];
     std::vector<torch::Tensor> grid_tensors = {grid_x, grid_y};
