@@ -377,6 +377,21 @@ target_link_libraries(test_vision_transformer
 )
 add_test(NAME vision_transformer_test COMMAND test_vision_transformer)
 
+# Load Function Test
+add_executable(test_load_fn
+    tests/test_load_fn.cpp
+)
+target_link_libraries(test_load_fn
+    PRIVATE
+    vggt
+    pthread
+    ${TORCH_LIBRARIES}
+    ${DEPENDENCIES}/lib/libgtest.a
+    ${DEPENDENCIES}/lib/libgtest_main.a
+    -Wl,--allow-multiple-definition
+)
+add_test(NAME load_fn_test COMMAND test_load_fn)
+
 # Helper Test
 add_executable(test_helper
     tests/test_helper.cpp
