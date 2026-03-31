@@ -26,7 +26,7 @@ AggregatorImpl::AggregatorImpl(
     embed_dim_(embed_dim),
     depth_(depth),
     num_register_tokens_(num_register_tokens),
-    patch_start_idx_(2 + num_register_tokens) {  // 2 camera tokens + register tokens
+    patch_start_idx_(1 + num_register_tokens) {  // 1 camera token per frame + register tokens per frame
 
     // Build the patch embedding module
     buildPatchEmbed(
@@ -42,12 +42,13 @@ AggregatorImpl::AggregatorImpl(
     );
 
     // Create learnable tokens for camera and registers
-    // In Python: self.camera_token = nn.Parameter(torch.zeros(1, 1, 2, embed_dim))
-    camera_token_ = register_parameter("camera_token", torch::zeros({1, 1, 2, embed_dim}));
+    // In Python: self.camera_token = nn.Parameter(torch.zeros(1, 2, 1, embed_dim))
+    camera_token_ = register_parameter("camera_token", torch::zeros({1, 2, 1, embed_dim}));
 
     // Register tokens
+    // In Python: self.register_token = nn.Parameter(torch.zeros(1, 2, num_register_tokens, embed_dim))
     if (num_register_tokens > 0) {
-        register_token_ = register_parameter("register_token", torch::zeros({1, 1, num_register_tokens, embed_dim}));
+        register_token_ = register_parameter("register_token", torch::zeros({1, 2, num_register_tokens, embed_dim}));
     }
 
     // Alternating attention configuration
@@ -95,7 +96,7 @@ AggregatorImpl::AggregatorImpl(
             rope_module
         );
         frame_blocks_.push_back(block);
-        register_module("frame_block_" + std::to_string(i), block);
+        register_module("frame_blocks_" + std::to_string(i), block);
     }
 
     for (int64_t i = 0; i < depth_; ++i) {
@@ -130,7 +131,7 @@ AggregatorImpl::AggregatorImpl(
             rope_module
         );
         global_blocks_.push_back(block);
-        register_module("global_block_" + std::to_string(i), block);
+        register_module("global_blocks_" + std::to_string(i), block);
     }
 
     // Initialize ResNet normalization constants
@@ -159,10 +160,25 @@ void AggregatorImpl::buildPatchEmbed(
 }
 
 torch::Tensor AggregatorImpl::sliceExpandAndFlatten(torch::Tensor token, int64_t B, int64_t S) {
-    // token: [1, 1, N, C] -> [B, S, N, C] -> [B*S, N, C]
+    // token: [1, 2, N, C] where dim=1 has 2 variants:
+    // - variant 0 (index 0): for the first frame
+    // - variant 1 (index 1): for remaining frames (S-1 frames)
+    // Result: [B*S, N, C]
+    
     int64_t N = token.size(2);
     int64_t C = token.size(3);
-    return token.expand({B, S, N, C}).reshape({B * S, N, C});
+    
+    // Slice out query tokens for first frame: [1, 1, N, C] -> expand to [B, 1, N, C]
+    auto query = token.slice(1, 0, 1).expand({B, 1, N, C});
+    
+    // Slice out others tokens for remaining frames: [1, 1, N, C] -> expand to [B, S-1, N, C]
+    auto others = token.slice(1, 1, 2).expand({B, S - 1, N, C});
+    
+    // Concatenate: [B, 1, N, C] + [B, S-1, N, C] -> [B, S, N, C]
+    auto combined = torch::cat({query, others}, 1);
+    
+    // Flatten to [B*S, N, C]
+    return combined.reshape({B * S, N, C});
 }
 
 std::pair<std::vector<torch::Tensor>, int64_t> AggregatorImpl::forward(torch::Tensor images) {

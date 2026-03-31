@@ -51,6 +51,7 @@ private:
     int64_t flows_emb_dim;
     int64_t transformer_dim;
 
+    torch::nn::Sequential corr_mlp{nullptr};
     EfficientUpdateFormer updateformer{nullptr};
     torch::nn::GroupNorm norm{nullptr};
     torch::nn::Sequential ffeat_updater{nullptr};

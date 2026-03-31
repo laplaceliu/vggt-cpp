@@ -179,7 +179,7 @@ DinoVisionTransformerImpl::DinoVisionTransformerImpl(
             torch::nn::AnyModule()   // rope
         ));
         blocks_.push_back(block);
-        register_module("block_" + std::to_string(i), block.ptr());
+        register_module("blocks_" + std::to_string(i), block.ptr());
     }
 
     // Create norm

@@ -20,16 +20,19 @@ BaseTrackerPredictorImpl::BaseTrackerPredictorImpl(
     hidden_size(hidden_size),
     fine(fine),
     flows_emb_dim(latent_dim / 2),
-    transformer_dim(corr_levels * std::pow(corr_radius * 2 + 1, 2) + latent_dim * 2) {
-
-    // Python logic: if transformer_dim % 2 == 0, add 4, then ensure divisible by 4
-    if (transformer_dim % 2 == 0) {
-        transformer_dim += 4;
-    }
-    transformer_dim += (4 - transformer_dim % 4) % 4;
+    // Python: transformer_dim = latent_dim + latent_dim + latent_dim + 4
+    // flows_emb (latent_dim) + flows (4) + fcorrs_ (latent_dim) + track_feats_ (latent_dim)
+    transformer_dim(latent_dim * 3 + 4) {
 
     int64_t space_depth = use_spaceatt ? depth : 0;
     int64_t time_depth = depth;
+
+    // Correlation MLP to map correlation features to latent_dim
+    corr_mlp = register_module("corr_mlp", torch::nn::Sequential(
+        torch::nn::Linear(corr_levels * std::pow(corr_radius * 2 + 1, 2), hidden_size),
+        torch::nn::GELU(),
+        torch::nn::Linear(hidden_size, latent_dim)
+    ));
 
     updateformer = register_module("updateformer", EfficientUpdateFormer(
         space_depth,
@@ -156,29 +159,23 @@ std::variant<
         // Reshape fcorrs: B, S, N, corrdim -> B*N, S, corrdim
         auto fcorrs_ = fcorrs.permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
+        // Apply corr_mlp to map correlation features to latent_dim
+        fcorrs_ = corr_mlp->forward(fcorrs_);
+
         // Movement of current coords relative to query points
         auto flows = (coords - coords.index({torch::indexing::Slice(), torch::indexing::Slice(0, 1)})).permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
         // Get 2D embedding for flows
         auto flows_emb = get_2d_embedding(flows, flows_emb_dim, false);
 
-        // Concatenate flows with embedding
-        flows_emb = torch::cat({flows_emb, flows}, -1);
+        // Concatenate flows with embedding and scale (Python adds flows/max_scale twice)
+        flows_emb = torch::cat({flows_emb, flows, flows}, -1);
 
         // Reshape track_feats: B, S, N, latent_dim -> B*N, S, latent_dim
         auto track_feats_ = track_feats.permute({0, 2, 1, 3}).reshape({B * N, S, -1});
 
-        // Concatenate as input for transformer
+        // Concatenate as input for transformer: [flows_emb, fcorrs_, track_feats_]
         auto transformer_input = torch::cat({flows_emb, fcorrs_, track_feats_}, 2);
-
-        // Pad or truncate features to match transformer_dim
-        if (transformer_input.size(2) < transformer_dim) {
-            auto pad_dim = transformer_dim - transformer_input.size(2);
-            auto pad = torch::zeros_like(flows_emb.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, pad_dim)}));
-            transformer_input = torch::cat({transformer_input, pad}, 2);
-        } else if (transformer_input.size(2) > transformer_dim) {
-            transformer_input = transformer_input.index({torch::indexing::Slice(), torch::indexing::Slice(), torch::indexing::Slice(0, transformer_dim)});
-        }
 
         // 2D positional embedding
         auto [pos_embed, _grid] = get_2d_sincos_pos_embed(transformer_dim, {HH, WW});

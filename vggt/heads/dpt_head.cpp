@@ -266,16 +266,17 @@ DPTHeadImpl::DPTHeadImpl(
     // resize_layers[2]: Identity for layer 2 (1024)
     // resize_layers[3]: Conv2d 2x downsampling for layer 3 (1024 -> 1024)
     // Note: Must register modules first, then wrap in AnyModule
+    // Use "resize_layers" prefix to match Python naming
     auto resize0 = torch::nn::ConvTranspose2d(
         torch::nn::ConvTranspose2dOptions(out_channels[0], out_channels[0], 4).stride(4).padding(0)
     );
-    register_module("resize0", resize0);
+    register_module("resize_layers_0", resize0);
     resize_layers_.push_back(torch::nn::AnyModule(resize0));
     
     auto resize1 = torch::nn::ConvTranspose2d(
         torch::nn::ConvTranspose2dOptions(out_channels[1], out_channels[1], 2).stride(2).padding(0)
     );
-    register_module("resize1", resize1);
+    register_module("resize_layers_1", resize1);
     resize_layers_.push_back(torch::nn::AnyModule(resize1));
     
     resize_layers_.push_back(torch::nn::AnyModule(torch::nn::Identity()));
@@ -283,7 +284,7 @@ DPTHeadImpl::DPTHeadImpl(
     auto resize3 = torch::nn::Conv2d(
         torch::nn::Conv2dOptions(out_channels[3], out_channels[3], 3).stride(2).padding(1)
     );
-    register_module("resize3", resize3);
+    register_module("resize_layers_3", resize3);
     resize_layers_.push_back(torch::nn::AnyModule(resize3));
 
     // Create scratch modules (feature fusion)

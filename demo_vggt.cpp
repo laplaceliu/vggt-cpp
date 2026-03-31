@@ -103,6 +103,9 @@ std::unordered_map<std::string, torch::Tensor> run_inference(
         images_tensor = std::get<0>(result);
         coords_tensor = std::get<1>(result);
         
+        // Add batch dimension: [S, 3, H, W] -> [1, S, 3, H, W]
+        images_tensor = images_tensor.unsqueeze(0);
+        
         // Explicitly set requires_grad to false
         images_tensor.set_requires_grad(false);
         coords_tensor.set_requires_grad(false);
@@ -289,6 +292,24 @@ int main(int argc, char** argv) {
     if (!print_weights_path.empty()) {
         auto weights = vggt::utils::WeightLoader::load_weights(print_weights_path);
         vggt::utils::WeightLoader::print_weight_info(weights);
+        return 0;
+    }
+
+    // Debug: print model parameter names
+    if (weight_path == "DEBUG_MODEL_PARAMS") {
+        torch::Device device = torch::kCPU;
+        auto model = std::make_unique<vggt::models::VGGTImpl>(518, 14, 1024);
+        model->to(device);
+        std::cout << "\n=== Model Parameter Names ===" << std::endl;
+        int count = 0;
+        for (const auto& param : model->named_parameters()) {
+            std::cout << "  " << param.key() << " : " << param.value().sizes() << std::endl;
+            count++;
+            if (count >= 100) {
+                std::cout << "  ... and more" << std::endl;
+                break;
+            }
+        }
         return 0;
     }
     
